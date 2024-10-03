@@ -144,6 +144,23 @@
         body.overlay-active {
             cursor: default;
         }
+
+        /* Nascondi il cursore su dispositivi mobili */
+        @media only screen and (max-width: 768px) {
+            .cursor, .cursor-trail {
+                display: none;
+            }
+
+            /* L'overlay occupa tutto lo schermo su mobile */
+            #overlay-content {
+                width: 100%;
+                right: -100%;
+            }
+
+            #symbol-overlay.visible #overlay-content {
+                right: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -195,9 +212,22 @@
         const backgroundOverlay = document.getElementById('background-overlay');
         const symbolOverlay = document.getElementById('symbol-overlay');
 
+        // Rileva se il dispositivo è mobile
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
         function init() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+
+            // Imposta il FOV e la posizione della telecamera per i dispositivi mobili
+            if (isMobile) {
+                camera.fov = 60;
+                camera.updateProjectionMatrix();
+                camera.position.set(-500, 300, 400);
+            } else {
+                camera.position.set(-500, 300, 400);
+            }
+
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('container').appendChild(renderer.domElement);
@@ -238,8 +268,6 @@
                 }
             );
 
-            camera.position.set(-500, 300, 400);  // Nuova vista iniziale
-
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 1.75;
@@ -248,13 +276,26 @@
             controls.maxDistance = 280;
 
             window.addEventListener('resize', onWindowResize, false);
-            document.addEventListener('mousemove', onMouseMove, false);
+
+            // Eventi per dispositivi non mobili
+            if (!isMobile) {
+                document.addEventListener('mousemove', onMouseMove, false);
+            }
+
             document.addEventListener('click', onMouseClick, false);
 
             addSymbolsInsideSphere();
 
             onWindowResize();
             animate();
+
+            // Nascondi il cursore su dispositivi mobili
+            if (isMobile) {
+                cursor.style.display = 'none';
+                cursorTrail1.style.display = 'none';
+                cursorTrail2.style.display = 'none';
+                cursorTrail3.style.display = 'none';
+            }
         }
 
         // Funzione per aggiungere i simboli all'interno della sfera
@@ -291,7 +332,7 @@
                 { texture: 'Mono-No-Aware.png', name: 'Mono No Aware', color: '#FFC300', image: 'images/MonoNoAwareOverlay.png' },
                 { texture: 'Fiducia.png', name: 'Fiducia', color: '#DAF7A6', image: 'images/FiduciaOverlay.png' },
                 { texture: 'Curiosita.png', name: 'Curiosità', color: '#581845', image: 'images/CuriositaOverlay.png' },
-				{ texture: 'Evoluzione.png', name: 'Evoluzione', color: '#DAF7A6', image: 'images/EvoluzioneOverlay.png' },
+                { texture: 'Evoluzione.png', name: 'Evoluzione', color: '#DAF7A6', image: 'images/EvoluzioneOverlay.png' },
             ];
 
             const positions = [
@@ -309,7 +350,7 @@
                 new THREE.Vector3(-300, -400, 300),
                 new THREE.Vector3(-450, 350, -200),
                 new THREE.Vector3(450, 300, 300),
-				new THREE.Vector3(450, -250, 300)
+                new THREE.Vector3(450, -250, 300)
             ];
 
             for (let i = 0; i < symbolData.length; i++) {
@@ -326,7 +367,7 @@
                 const symbolMesh = new THREE.Mesh(symbolGeometry, symbolMaterial);
 
                 symbolMesh.position.set(positions[i].x, positions[i].y, positions[i].z);
-                symbolMesh.lookAt(new THREE.Vector3(0, 0, 0)); // Guarda verso il centro della sfera
+                symbolMesh.lookAt(camera.position); // Guarda sempre verso la telecamera
 
                 // Memorizza i dati del simbolo in userData
                 symbolMesh.userData = Object.assign({
@@ -374,8 +415,14 @@
             event.preventDefault();
 
             // Calcola la posizione del mouse in coordinate normalizzate del dispositivo (-1 a +1)
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            if (!isMobile) {
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            } else {
+                // Posizione centrale per dispositivi mobili
+                mouse.x = 0;
+                mouse.y = 0;
+            }
 
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(symbols);
@@ -440,68 +487,62 @@
 
         function centerSymbol(symbol) {
             const targetPosition = symbol.position.clone();
+            const overlayWidth = window.innerWidth * 0.4;  // 40% dell'overlay che copre il lato destro
+            const visibleWidth = window.innerWidth - overlayWidth;  // La porzione visibile a sinistra
 
-            // Distanza desiderata dal simbolo
-            const distance = 500; // Puoi regolare questa distanza
+            // Calcola la distanza tra la telecamera e il simbolo
+            const distance = camera.position.distanceTo(targetPosition);
 
-            // Vettore di direzione della telecamera
-            const cameraDirection = new THREE.Vector3();
-            camera.getWorldDirection(cameraDirection);
-
-            // Vettore destro della telecamera
+            // Ottieni il vettore destro della telecamera
             const cameraRight = new THREE.Vector3();
-            cameraRight.crossVectors(camera.up, cameraDirection).normalize();
+            camera.getWorldDirection(cameraRight);
+            cameraRight.crossVectors(camera.up, cameraRight).normalize();
 
-            // Ottieni le dimensioni dello schermo
-            const screenWidth = window.innerWidth;
-            const screenHeight = window.innerHeight;
+            // Imposta la posizione NDC X desiderata per il centro della porzione visibile
+            const desiredNDCX = -0.5 * (visibleWidth / window.innerWidth); // -0.5 è il centro dello schermo, scalato per la parte visibile
 
-            // Calcola il campo visivo orizzontale in radianti
-            const verticalFOV = THREE.Math.degToRad(camera.fov);
-            const aspect = camera.aspect;
-            const horizontalFOV = 2 * Math.atan(Math.tan(verticalFOV / 2) * aspect);
+            // Proietta la posizione del simbolo in coordinate NDC
+            const symbolScreenPosition = targetPosition.clone().project(camera);
 
-            // Calcola l'angolo per pixel
-            const anglePerPixel = horizontalFOV / screenWidth;
+            // Calcola la differenza in NDC
+            const deltaNDCX = symbolScreenPosition.x - desiredNDCX;
 
-            // Distanza desiderata dal bordo sinistro in pixel
-            const pixelOffset = 100;
-
-            // Calcola l'angolo di offset
-            const angleOffset = anglePerPixel * pixelOffset;
-
-            // Calcola lo shift in unità del mondo
-            const shift = Math.tan(angleOffset) * distance;
+            // Converti la differenza NDC in unità del mondo
+            const horizontalFOV = 2 * Math.atan(Math.tan(THREE.Math.degToRad(camera.fov) / 2) * camera.aspect);
+            const halfWidthAtDistance = Math.tan(horizontalFOV / 2) * distance;
+            const shiftWorldUnits = -deltaNDCX * halfWidthAtDistance;
 
             // Calcola la nuova posizione della telecamera
-            const newCameraPosition = new THREE.Vector3().copy(targetPosition)
-                .addScaledVector(cameraDirection, -distance)
-                .addScaledVector(cameraRight, -shift);
+            const newCameraPosition = camera.position.clone().addScaledVector(cameraRight, shiftWorldUnits);
 
-            // Anima la telecamera per centrare il simbolo
+            // Anima la posizione della telecamera
             gsap.to(camera.position, {
                 x: newCameraPosition.x,
                 y: newCameraPosition.y,
                 z: newCameraPosition.z,
                 duration: 1,
-                onUpdate: function() {
+                onUpdate: function () {
                     camera.lookAt(targetPosition);
                     controls.update();
                 }
             });
 
+            // Anima il target dei controlli
             gsap.to(controls.target, {
                 x: targetPosition.x,
                 y: targetPosition.y,
                 z: targetPosition.z,
                 duration: 1,
-                onUpdate: function() {
+                onUpdate: function () {
                     controls.update();
                 }
             });
 
             // Assicura che il simbolo guardi direttamente la telecamera
             symbol.lookAt(camera.position);
+
+            // Anima l'ingrandimento del simbolo
+            gsap.to(symbol.scale, { x: 2, y: 2, z: 2, duration: 1 });
         }
 
         function resetCameraPosition() {
@@ -525,10 +566,17 @@
                     controls.update();
                 }
             });
+
+            // Reimposta la scala del simbolo
+            if (intersectedObject) {
+                gsap.to(intersectedObject.scale, { x: 1, y: 1, z: 1, duration: 1 });
+            }
         }
 
         function checkIntersection() {
             if (symbolOverlay.classList.contains('visible')) return;
+
+            if (isMobile) return; // Disabilita l'hover su dispositivi mobili
 
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(symbols);
@@ -561,10 +609,15 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            // Aggiungi una leggera rotazione sull'asse Y
+            // Aggiungi una rotazione sull'asse Y
             if (sphere) {
-                sphere.rotation.y += 0.0009;
+                sphere.rotation.y += isMobile ? 0.002 : 0.0009;
             }
+
+            // Aggiorna l'orientamento dei simboli per evitare distorsioni
+            symbols.forEach(symbol => {
+                symbol.lookAt(camera.position);
+            });
 
             checkIntersection(); // Verifica le intersezioni con i simboli
 
