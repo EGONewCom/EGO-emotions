@@ -1,679 +1,908 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Interactive Distortion Effect</title>
-    <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
+  <meta charset="UTF-8">
+  <title>Interactive Distortion Effect</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    /* Includi il font Neue Haas Unica W1G */
+    @font-face {
+      font-family: 'Neue Haas Unica W1G';
+      src: url('fonts/NeueHaasUnicaW1G-Regular.woff2') format('woff2'),
+           url('fonts/NeueHaasUnicaW1G-Regular.woff') format('woff');
+      font-weight: normal;
+      font-style: normal;
+    }
 
-        /* Includi il font Neue Haas Unica W1G */
-        @font-face {
-            font-family: 'Neue Haas Unica W1G';
-            src: url('fonts/NeueHaasUnicaW1G-Regular.woff2') format('woff2'),
-                 url('fonts/NeueHaasUnicaW1G-Regular.woff') format('woff');
-            font-weight: normal;
-            font-style: normal;
-        }
+    .cursor, .cursor-trail {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      background: radial-gradient(circle, rgba(255,255,255,0.8), rgba(255,255,255,0));
+      border-radius: 50%;
+      pointer-events: none;
+      mix-blend-mode: screen;
+      transform: translate(-50%, -50%);
+    }
+    .cursor-trail {
+      width: 90px;
+      height: 0px;
+      opacity: 0.8;
+    }
 
-        .cursor, .cursor-trail {
-            position: absolute;
-            width: 80px;
-            height: 80px;
-            background: radial-gradient(circle, rgba(255,255,255,0.8), rgba(255,255,255,0));
-            border-radius: 50%;
-            pointer-events: none;
-            mix-blend-mode: screen;
-            transform: translate(-50%, -50%);
-        }
+    /* Stili per il contenitore delle informazioni */
+    #info-container {
+      position: absolute;
+      bottom: 50px;
+      width: 100%;
+      text-align: center;
+      color: white;
+      font-family: 'Neue Haas Unica W1G', Arial, sans-serif;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    #symbol-info {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .decorative-line {
+      width: 200px;
+      height: 2px;
+      background-color: white;
+      margin: 0 20px;
+    }
+    #symbol-name {
+      font-size: 80px;
+      font-weight: bold;
+      text-transform: uppercase;
+      display: inline-block;
+    }
+    #symbol-description {
+      font-size: 30px;
+      margin-top: 20px;
+    }
 
-        .cursor-trail {
-            width: 90px;
-            height: 0px;
-            opacity: 0.8;
-        }
+    /* Stili per l'overlay */
+    #symbol-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      visibility: hidden;
+      z-index: 1000;
+      transition: opacity 0.5s ease-in-out;
+      pointer-events: none;
+    }
+    #symbol-overlay.visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
 
-        /* Stili per il contenitore delle informazioni */
-        #info-container {
-            position: absolute;
-            bottom: 50px;
-            width: 100%;
-            text-align: center;
-            color: white;
-            font-family: 'Neue Haas Unica W1G', Arial, sans-serif;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.5s;
-        }
+    /* Overlay colorato per oscurare la pagina */
+    #background-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: transparent;
+      z-index: 900;
+      pointer-events: none;
+      transition: background-color 0.5s ease-in-out;
+    }
 
-        #symbol-info {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+    /* Overlay contenuto */
+    #overlay-content {
+      position: absolute;
+      top: 0;
+      right: -40%;
+      width: 40%;
+      height: 100%;
+      background-color: #fff;
+      overflow-y: auto;
+      padding: 40px;
+      box-sizing: border-box;
+      transition: right 0.5s ease-in-out;
+      font-family: 'Neue Haas Unica W1G', Arial, sans-serif;
+    }
+    #symbol-overlay.visible #overlay-content {
+      right: 0;
+    }
 
-        .decorative-line {
-            width: 200px;
-            height: 2px;
-            background-color: white;
-            margin: 0 20px;
-        }
+    #close-overlay {
+      position: absolute;
+      top: 50px;
+      right: 50px;
+      font-size: 100px;
+      font-weight: bold;
+      color: black;
+      cursor: pointer;
+    }
 
-        #symbol-name {
-            font-size: 60px;
-            font-weight: bold;
-            text-transform: uppercase;
-            display: inline-block;
-        }
+    /* Immagine all'interno dell'overlay */
+    #overlay-image {
+      width: 100%;
+      height: auto;
+      object-fit: cover;
+    }
 
-        #symbol-description {
-            font-size: 30px;
-            margin-top: 20px;
-        }
+    /* Mostra il cursore quando l'overlay è visibile */
+    body.overlay-active {
+      cursor: default;
+    }
 
-        /* Stili per l'overlay */
-        #symbol-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            visibility: hidden;
-            z-index: 1000;
-            transition: opacity 0.5s ease-in-out;
-            pointer-events: none;
-        }
+    /* ---------- Nuovo CSS per il menu (bottone + overlay) ---------- */
+    #menu-button {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 9999;
+      background: transparent;
+      color: #fff;
+      padding: 10px 40px;
+      border: 0.5px solid #fff; /* contorno bianco sottilissimo */
+      border-radius: 40px;      /* forma “pill” */
+      cursor: pointer;
+      font-size: 18px;
+    }
+    #menu-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #fff;
+      color: #000;
+      z-index: 9998;
+      display: none;
+      overflow-y: auto;
+      padding: 20px;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+    #menu-overlay.visible {
+      display: block;
+    }
+    #close-menu {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: #000;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    #symbol-list {
+      list-style: none;
+      padding: 0;
+      margin-top: 60px;
+    }
+    #symbol-list li {
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
 
-        #symbol-overlay.visible {
-            opacity: 1;
-            visibility: visible;
-            pointer-events: auto;
-        }
-
-        /* Overlay colorato per oscurare la pagina */
-        #background-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: transparent;
-            z-index: 900;
-            pointer-events: none;
-            transition: background-color 0.5s ease-in-out;
-        }
-
-        /* Overlay contenuto */
-        #overlay-content {
-            position: absolute;
-            top: 0;
-            right: -40%;
-            width: 40%;
-            height: 100%;
-            background-color: #fff;
-            overflow-y: auto;
-            padding: 40px;
-            box-sizing: border-box;
-            transition: right 0.5s ease-in-out;
-            font-family: 'Neue Haas Unica W1G', Arial, sans-serif;
-        }
-
-        #symbol-overlay.visible #overlay-content {
-            right: 0;
-        }
-
-        #close-overlay {
-            position: absolute;
-            top: 50px;
-            right: 50px;
-            font-size: 100px;
-            font-weight: bold;
-            color: black;
-            cursor: pointer;
-        }
-
-        /* Immagine all'interno dell'overlay */
-        #overlay-image {
-            width: 100%;
-            height: auto;
-            object-fit: cover;
-        }
-
-        /* Mostra il cursore quando l'overlay è visibile */
-        body.overlay-active {
-            cursor: default;
-        }
-
-        /* Nascondi il cursore su dispositivi mobili */
-        @media only screen and (max-width: 768px) {
-            .cursor, .cursor-trail {
-                display: none;
-            }
-
-            /* L'overlay occupa tutto lo schermo su mobile */
-            #overlay-content {
-                width: 100%;
-                right: -100%;
-            }
-
-            #symbol-overlay.visible #overlay-content {
-                right: 0;
-            }
-        }
-    </style>
+    /* ---------- Istruzioni in basso (dimensioni testo dimezzate) ---------- */
+    #instructions {
+      position: absolute;
+      bottom: 60px;
+      width: 100%;
+      text-align: center;
+      color: white;
+      font-family: 'Neue Haas Unica W1G', Arial, sans-serif;
+      pointer-events: none;
+      opacity: 1;
+      transition: opacity 0.5s;
+      z-index: 9999;
+    }
+    #instructions h1 {
+      font-size: 25px;  /* metà rispetto a 50px */
+      margin-bottom: 10px;
+    }
+    #instructions p {
+      font-size: 10px;  /* metà rispetto a 20px */
+      margin: 0;
+    }
+  </style>
 </head>
 <body>
-    <div id="container"></div>
-    <div id="cursor" class="cursor"></div>
-    <div id="cursor-trail-1" class="cursor-trail"></div>
-    <div id="cursor-trail-2" class="cursor-trail"></div>
-    <div id="cursor-trail-3" class="cursor-trail"></div>
 
-    <!-- Contenitore delle informazioni -->
-    <div id="info-container">
-        <div id="symbol-info">
-            <div class="decorative-line"></div>
-            <div id="symbol-name"></div>
-            <div class="decorative-line"></div>
-        </div>
-        <div id="symbol-description"></div>
+  <!-- Bottone menu (testo “All emotions”) -->
+  <button id="menu-button">All emotions</button>
+
+  <!-- Overlay menu -->
+  <div id="menu-overlay">
+    <button id="close-menu">Chiudi</button>
+    <h1>Menu di Navigazione</h1>
+    <p>Comandi e resoconto dei simboli</p>
+    <h2>Elenco Simboli</h2>
+    <ul id="symbol-list"></ul>
+  </div>
+
+  <!-- Blocco istruzioni: appare al caricamento e scompare al primo movimento -->
+  <div id="instructions">
+    <h1>Drag to move in our world</h1>
+    <p>Drag right or left on the screen to discover in 360° how emotions guide us.</p>
+  </div>
+
+  <div id="container"></div>
+  <div id="cursor" class="cursor"></div>
+  <div id="cursor-trail-1" class="cursor-trail"></div>
+  <div id="cursor-trail-2" class="cursor-trail"></div>
+  <div id="cursor-trail-3" class="cursor-trail"></div>
+
+  <!-- Contenitore delle informazioni -->
+  <div id="info-container">
+    <div id="symbol-info">
+      <div class="decorative-line"></div>
+      <div id="symbol-name"></div>
+      <div class="decorative-line"></div>
     </div>
+    <div id="symbol-description"></div>
+  </div>
 
-    <!-- Overlay colorato per oscurare la pagina -->
-    <div id="background-overlay"></div>
+  <!-- Overlay colorato per oscurare la pagina -->
+  <div id="background-overlay"></div>
 
-    <!-- Overlay per il contenuto dei simboli con immagine -->
-    <div id="symbol-overlay">
-        <div id="overlay-content">
-            <span id="close-overlay">&times;</span>
-            <!-- Immagine che verrà cambiata dinamicamente -->
-            <img id="overlay-image" src="URL_DELLA_TUA_IMMAGINE.jpg" alt="Symbol Image">
-        </div>
+  <!-- Overlay per il contenuto dei simboli con immagine -->
+  <div id="symbol-overlay">
+    <div id="overlay-content">
+      <span id="close-overlay">&times;</span>
+      <!-- Immagine che verrà cambiata dinamicamente -->
+      <img id="overlay-image" src="URL_DELLA_TUA_IMMAGINE.jpg" alt="Symbol Image">
     </div>
+  </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
-    <script>
-        let scene, camera, renderer, sphere, controls, uniforms, raycaster, mouse, intersectedObject;
-        const symbols = []; // Array per tenere traccia dei simboli
-        const cursor = document.getElementById('cursor');
-        const cursorTrail1 = document.getElementById('cursor-trail-1');
-        const cursorTrail2 = document.getElementById('cursor-trail-2');
-        const cursorTrail3 = document.getElementById('cursor-trail-3');
+  <!-- Three.js, OrbitControls e GSAP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
 
-        // Elementi per visualizzare le informazioni del simbolo
-        const infoContainer = document.getElementById('info-container');
-        const symbolNameElement = document.getElementById('symbol-name');
-        const symbolDescriptionElement = document.getElementById('symbol-description');
+  <script>
+    // Avviso: esegui il file tramite un server locale (non file://) per evitare problemi con CORS.
+    if (location.protocol === "file:") {
+      console.warn("Esegui il file tramite un server locale per evitare problemi con CORS.");
+    }
 
-        // Elementi dell'overlay
-        const backgroundOverlay = document.getElementById('background-overlay');
-        const symbolOverlay = document.getElementById('symbol-overlay');
+    let scene, camera, renderer, sphere, controls, uniforms, raycaster, mouse;
+    let intersectedObject;
+    const symbols = [];
+    const cursor = document.getElementById('cursor');
+    const cursorTrail1 = document.getElementById('cursor-trail-1');
+    const cursorTrail2 = document.getElementById('cursor-trail-2');
+    const cursorTrail3 = document.getElementById('cursor-trail-3');
 
-        // Rileva se il dispositivo è mobile
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    // Elementi per le info
+    const infoContainer = document.getElementById('info-container');
+    const symbolNameElement = document.getElementById('symbol-name');
+    const symbolDescriptionElement = document.getElementById('symbol-description');
 
-        function init() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+    // Elementi overlay
+    const backgroundOverlay = document.getElementById('background-overlay');
+    const symbolOverlay = document.getElementById('symbol-overlay');
 
-            // Imposta il FOV e la posizione della telecamera per i dispositivi mobili
-            if (isMobile) {
-                camera.fov = 60;
-                camera.updateProjectionMatrix();
-                camera.position.set(-500, 300, 400);
-            } else {
-                camera.position.set(-500, 300, 400);
-            }
+    // ---------- Nuovo codice per il menu ----------
+    const menuButton = document.getElementById('menu-button');
+    const menuOverlay = document.getElementById('menu-overlay');
+    const closeMenu = document.getElementById('close-menu');
+    const symbolList = document.getElementById('symbol-list');
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.getElementById('container').appendChild(renderer.domElement);
+    menuButton.addEventListener('click', () => {
+      menuOverlay.classList.add('visible');
+      populateSymbolList();
+    });
+    closeMenu.addEventListener('click', () => {
+      menuOverlay.classList.remove('visible');
+    });
 
-            raycaster = new THREE.Raycaster();
-            mouse = new THREE.Vector2();
+    function populateSymbolList() {
+      symbolList.innerHTML = '';
+      // Popola la lista con i simboli esistenti
+      symbols.forEach((symbol) => {
+        const li = document.createElement('li');
+        li.textContent = symbol.userData.name + " - " + symbol.userData.description;
+        li.addEventListener('click', () => {
+          showOverlay(symbol.userData);
+          menuOverlay.classList.remove('visible');
+        });
+        symbolList.appendChild(li);
+      });
+    }
+    // ---------- Fine menu ----------
 
-            const textureLoader = new THREE.TextureLoader();
-            textureLoader.crossOrigin = '';  // Abilita il supporto CORS
+    // ---------- Istruzioni in basso ----------
+    const instructions = document.getElementById('instructions');
+    let instructionsVisible = true;
+    function hideInstructions() {
+      if (!instructionsVisible) return;
+      instructionsVisible = false;
+      gsap.to(instructions, {
+        duration: 0.8,
+        opacity: 0,
+        onComplete: () => {
+          instructions.style.display = 'none';
+        }
+      });
+    }
+    // Nascondi le istruzioni al primo click/tocco
+    document.addEventListener('mousedown', hideInstructions, { once: true });
+    document.addEventListener('touchstart', hideInstructions, { once: true });
+    // ---------- Fine istruzioni ----------
 
-            textureLoader.load(
-                'Sfumatura-lr.jpg',
-                function (texture) {
-                    texture.wrapS = THREE.ClampToEdgeWrapping;
-                    texture.wrapT = THREE.ClampToEdgeWrapping;
-                    texture.minFilter = THREE.LinearFilter;
+    // ======================================================
+    // 1) Classe AnimatedSpriteTexture (spritesheet orizzontale con NearestFilter)
+    //    Modificata per usare NearestFilter per eliminare l'alone nero
+    // ======================================================
+    class AnimatedSpriteTexture {
+      constructor(texture, frames, frameDuration) {
+        this.texture = texture;       // La texture caricata (lo spritesheet)
+        this.frames = frames;         // Numero totale di frame (in una sola riga)
+        this.frameDuration = frameDuration; // Durata di ogni frame in ms
+        this.currentFrame = 0;
+        this.accumulator = 0;
+        this.isPlaying = false;
+        // Imposta repeat per mostrare solo un frame (1/frames in orizzontale, 1 in verticale)
+        texture.repeat.set(1 / frames, 1);
+        texture.offset.set(0, 0);
+        // Usa NearestFilter per evitare l'interpolazione che causa alone nero
+        texture.minFilter = THREE.NearestFilter;
+        texture.magFilter = THREE.NearestFilter;
+        texture.needsUpdate = true;
+      }
+      play() {
+        this.isPlaying = true;
+        this.currentFrame = 0;
+        this.accumulator = 0;
+        this.texture.offset.set(0, 0);
+        this.texture.needsUpdate = true;
+      }
+      pause() {
+        this.isPlaying = false;
+      }
+      // deltaTime in secondi
+      update(deltaTime) {
+        if (!this.isPlaying) return;
+        this.accumulator += deltaTime * 1000;
+        if (this.accumulator >= this.frameDuration) {
+          this.accumulator = 0;
+          this.currentFrame = (this.currentFrame + 1) % this.frames;
+          this.texture.offset.x = this.currentFrame / this.frames;
+          this.texture.needsUpdate = true;
+        }
+      }
+    }
 
-                    uniforms = {
-                        u_texture: { value: texture },
-                        u_mouse: { value: new THREE.Vector2(0, 0) }  // Uniform per la posizione del mouse
-                    };
+    // ======================================================
+    // 2) Caricamento dei simboli con spritesheet per l'hover
+    //    (Tutti i simboli invariati)
+    // ======================================================
+    async function addSymbolsInsideSphere() {
+      const loader = new THREE.TextureLoader();
 
-                    const geometry = new THREE.SphereGeometry(700, 228, 228);  
+      // I dati dei simboli (tutti invariati)
+      const symbolData = [
+        { 
+          texture: 'Rame.png', 
+          hoverSpritesheet: 'Rame-spritesheet.png',
+          frames: 25,
+          frameDuration: 30,
+          name: 'Ramè', 
+          color: '#FF5733', 
+          image: 'images/RameOverlay.png' 
+        },
+        { 
+          texture: 'Cafune.png', 
+          hoverSpritesheet: 'Cafune-spritesheet.png',
+          frames: 63,
+          frameDuration: 30,
+          name: 'Cafunè', 
+          color: '#33FF57', 
+          image: 'images/CafuneOverlay.png' 
+        },
+        { 
+          texture: 'Empatia.png', 
+          hoverSpritesheet: 'Empatia-spritesheet.png',
+          frames: 42,
+          frameDuration: 30,
+          name: 'Empatia', 
+          color: '#3357FF', 
+          image: 'images/EmpatiaOverlay.png' 
+        },
+        { 
+          texture: 'Meraviglia.png', 
+          hoverSpritesheet: 'Meraviglia-spritesheet.png',
+          frames: 6,
+          frameDuration: 30,
+          name: 'Meraviglia', 
+          color: '#FF33A8', 
+          image: 'images/MeravigliaOverlay.png' 
+        },
+        { 
+          texture: 'Protezione.png', 
+          hoverSpritesheet: 'Protezione-spritesheet.png',
+          frames: 54,
+          frameDuration: 30,
+          name: 'Protezione', 
+          color: 'rgba(34, 107, 223, 0.5)', 
+          image: 'images/ProtezioneOverlay.png',
+          userData: {
+            chapter: 'LOREM IPSUM',
+            title: 'Protezione',
+            mainImage: 'schermata-overlay.png',
+            text1: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+            additionalImage: 'Black Bottle.jpg',
+            imageDescription: 'Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.',
+            text2: 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Abbraccio.png', 
+          hoverSpritesheet: 'Abbraccio-spritesheet.png',
+          frames: 17,
+          frameDuration: 30,
+          name: 'Abbraccio', 
+          color: '#FFC300', 
+          image: 'images/AbbraccioOverlay.png' 
+        },
+        { 
+          texture: 'Gioia-condivisa.png', 
+          hoverSpritesheet: 'Gioia-condivisa-spritesheet.png',
+          frames: 17,
+          frameDuration: 30,
+          name: 'Gioia condivisa', 
+          color: '#DAF7A6', 
+          image: 'images/GioiaCondivisaOverlay.png' 
+        },
+        { 
+          texture: 'Autenticita.png', 
+          hoverSpritesheet: 'Autenticita-spritesheet.png',
+          frames: 13,
+          frameDuration: 60,
+          name: 'Autenticità', 
+          color: '#581845', 
+          image: 'images/AutenticitaOverlay.png' 
+        },
+        { 
+          texture: 'Comprensione.png', 
+          hoverSpritesheet: 'Comprensione-spritesheet.png',
+          frames: 26,
+          frameDuration: 30,
+          name: 'Comprensione', 
+          color: '#900C3F', 
+          image: 'images/ComprensioneOverlay.png' 
+        },
+        { 
+          texture: 'Rispetto.png', 
+          hoverSpritesheet: 'Rispetto-spritesheet.png',
+          frames: 6,
+          frameDuration: 120,
+          name: 'Rispetto', 
+          color: '#C70039', 
+          image: 'images/RispettoOverlay.png' 
+        },
+        { 
+          texture: 'Accoglienza.png', 
+          hoverSpritesheet: 'Accoglienza-spritesheet.png',
+          frames: 33,
+          frameDuration: 30,
+          name: 'Accoglienza', 
+          color: '#FF5733', 
+          image: 'images/AccoglienzaOverlay.png' 
+        },
+        { 
+          texture: 'Mono-No-Aware.png', 
+          hoverSpritesheet: 'MonoNoAware-spritesheet.png',
+          frames: 25,
+          frameDuration: 30,
+          name: 'Mono No Aware', 
+          color: '#FFC300', 
+          image: 'images/MonoNoAwareOverlay.png' 
+        },
+        { 
+          texture: 'Fiducia.png', 
+          hoverSpritesheet: 'Fiducia-spritesheet.png',
+          frames: 15,
+          frameDuration: 40,
+          name: 'Fiducia', 
+          color: '#DAF7A6', 
+          image: 'images/FiduciaOverlay.png' 
+        },
+        { 
+          texture: 'Curiosita.png', 
+          hoverSpritesheet: 'Curiosita-spritesheet.png',
+          frames: 17,
+          frameDuration: 40,
+          name: 'Curiosità', 
+          color: '#581845', 
+          image: 'images/CuriositaOverlay.png' 
+        },
+        { 
+          texture: 'Evoluzione.png', 
+          hoverSpritesheet: 'Evoluzione-spritesheet.png',
+          frames: 33,
+          frameDuration: 30,
+          name: 'Evoluzione', 
+          color: '#DAF7A6', 
+          image: 'images/EvoluzioneOverlay.png' 
+        }
+      ];
 
-                    const material = new THREE.ShaderMaterial({
-                        uniforms: uniforms,
-                        vertexShader: document.getElementById('vertexShader').textContent,
-                        fragmentShader: document.getElementById('fragmentShader').textContent,
-                        side: THREE.DoubleSide
-                    });
+      const positions = [
+        new THREE.Vector3(100, 50, 300),
+        new THREE.Vector3(-350, -40, 130),
+        new THREE.Vector3(150, -250, -350),
+        new THREE.Vector3(350, 570, -200),
+        new THREE.Vector3(350, 10, -100),
+        new THREE.Vector3(150, 180, -300),
+        new THREE.Vector3(150, 470, 200),
+        new THREE.Vector3(150, -370, 300),
+        new THREE.Vector3(-220, -560, -350),
+        new THREE.Vector3(-350, 350, 300),
+        new THREE.Vector3(-270, 10, -300),
+        new THREE.Vector3(-300, -400, 300),
+        new THREE.Vector3(-450, 350, -200),
+        new THREE.Vector3(450, 300, 300),
+        new THREE.Vector3(450, -250, 300)
+      ];
 
-                    sphere = new THREE.Mesh(geometry, material);
-                    scene.add(sphere);
-                },
-                undefined,
-                function (err) {
-                    console.error('An error happened.', err);
-                }
+      for (let i = 0; i < symbolData.length; i++) {
+        const data = symbolData[i];
+        let staticTexture;
+        try {
+          staticTexture = await new Promise((resolve, reject) => {
+            loader.load(
+              data.texture,
+              resolve,
+              undefined,
+              (err) => {
+                console.error("Errore nel caricamento della texture: " + data.texture, err);
+                reject(err);
+              }
             );
-
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 1.75;
-            controls.enableZoom = true;
-            controls.minDistance = 80;
-            controls.maxDistance = 280;
-
-            window.addEventListener('resize', onWindowResize, false);
-
-            // Eventi per dispositivi non mobili
-            if (!isMobile) {
-                document.addEventListener('mousemove', onMouseMove, false);
-            }
-
-            document.addEventListener('click', onMouseClick, false);
-
-            addSymbolsInsideSphere();
-
-            onWindowResize();
-            animate();
-
-            // Nascondi il cursore su dispositivi mobili
-            if (isMobile) {
-                cursor.style.display = 'none';
-                cursorTrail1.style.display = 'none';
-                cursorTrail2.style.display = 'none';
-                cursorTrail3.style.display = 'none';
-            }
+          });
+        } catch (e) {
+          console.error("Salto il simbolo " + data.name + " per errore nel caricamento della texture.");
+          continue;
         }
-
-        // Funzione per aggiungere i simboli all'interno della sfera
-        function addSymbolsInsideSphere() {
-            const loader = new THREE.TextureLoader();
-            
-            const symbolData = [
-                { texture: 'Rame.png', name: 'Ramè', color: '#FF5733', image: 'images/RameOverlay.png' },
-                { texture: 'Cafune.png', name: 'Cafunè', color: '#33FF57', image: 'images/CafuneOverlay.png' },
-                { texture: 'Empatia.png', name: 'Empatia', color: '#3357FF', image: 'images/EmpatiaOverlay.png' },
-                { texture: 'Meraviglia.png', name: 'Meraviglia', color: '#FF33A8', image: 'images/MeravigliaOverlay.png' },
-                { 
-                    texture: 'Protezione.png', 
-                    name: 'Protezione', 
-                    color: 'rgba(34, 107, 223, 0.5)', 
-                    image: 'images/ProtezioneOverlay.png',
-                    userData: {
-                        chapter: 'LOREM IPSUM',
-                        title: 'Protezione',
-                        mainImage: 'schermata overlay.png', // Qui va l'immagine specifica per il simbolo
-                        text1: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
-                        additionalImage: 'Black Bottle.jpg',
-                        imageDescription: 'Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit.',
-                        text2: 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
-                        buttonText: 'Esplora il progetto'
-                    }
-                },
-                { texture: 'Abbraccio.png', name: 'Abbraccio', color: '#FFC300', image: 'images/AbbraccioOverlay.png' },
-                { texture: 'Gioia-condivisa.png', name: 'Gioia condivisa', color: '#DAF7A6', image: 'images/GioiaCondivisaOverlay.png' },
-                { texture: 'Autenticita.png', name: 'Autenticità', color: '#581845', image: 'images/AutenticitaOverlay.png' },
-                { texture: 'Comprensione.png', name: 'Comprensione', color: '#900C3F', image: 'images/ComprensioneOverlay.png' },
-                { texture: 'Rispetto.png', name: 'Rispetto', color: '#C70039', image: 'images/RispettoOverlay.png' },
-                { texture: 'Accoglienza.png', name: 'Accoglienza', color: '#FF5733', image: 'images/AccoglienzaOverlay.png' },
-                { texture: 'Mono-No-Aware.png', name: 'Mono No Aware', color: '#FFC300', image: 'images/MonoNoAwareOverlay.png' },
-                { texture: 'Fiducia.png', name: 'Fiducia', color: '#DAF7A6', image: 'images/FiduciaOverlay.png' },
-                { texture: 'Curiosita.png', name: 'Curiosità', color: '#581845', image: 'images/CuriositaOverlay.png' },
-                { texture: 'Evoluzione.png', name: 'Evoluzione', color: '#DAF7A6', image: 'images/EvoluzioneOverlay.png' },
-            ];
-
-            const positions = [
-                new THREE.Vector3(100, 50, 300),
-                new THREE.Vector3(-350, -40, 130),
-                new THREE.Vector3(150, -250, -350),
-                new THREE.Vector3(350, 570, -200),
-                new THREE.Vector3(350, 10, -100),
-                new THREE.Vector3(150, 180, -300),
-                new THREE.Vector3(150, 470, 200),
-                new THREE.Vector3(150, -370, 300),
-                new THREE.Vector3(-220, -560, -350),
-                new THREE.Vector3(-350, 350, 300),
-                new THREE.Vector3(-270, 10, -300),
-                new THREE.Vector3(-300, -400, 300),
-                new THREE.Vector3(-450, 350, -200),
-                new THREE.Vector3(450, 300, 300),
-                new THREE.Vector3(450, -250, 300)
-            ];
-
-            for (let i = 0; i < symbolData.length; i++) {
-                const data = symbolData[i];
-                const texture = loader.load(data.texture);
-                const symbolMaterial = new THREE.MeshBasicMaterial({
-                    map: texture,
-                    transparent: true,
-                    opacity: 1.0,
-                    side: THREE.DoubleSide,
-                });
-
-                const symbolGeometry = new THREE.PlaneGeometry(90, 90);
-                const symbolMesh = new THREE.Mesh(symbolGeometry, symbolMaterial);
-
-                symbolMesh.position.set(positions[i].x, positions[i].y, positions[i].z);
-                symbolMesh.lookAt(camera.position); // Guarda sempre verso la telecamera
-
-                // Memorizza i dati del simbolo in userData
-                symbolMesh.userData = Object.assign({
-                    name: data.name,
-                    description: 'Descrizione dettagliata del simbolo ' + data.name,
-                    image: data.image, // Percorso all'immagine dell'overlay
-                    color: data.color || 'rgba(0,0,0,0.5)'
-                }, data.userData || {});
-
-                scene.add(symbolMesh);
-                symbols.push(symbolMesh); // Aggiungi all'array per il raycasting
-            }
+        
+        const symbolGeometry = new THREE.PlaneGeometry(80, 80);
+        
+        let spriteTexture;
+        let animatedSprite = null;
+        try {
+          spriteTexture = await new Promise((resolve, reject) => {
+            loader.load(
+              data.hoverSpritesheet,
+              resolve,
+              undefined,
+              (err) => {
+                console.error("Errore nel caricamento dello spritesheet: " + data.hoverSpritesheet, err);
+                reject(err);
+              }
+            );
+          });
+          animatedSprite = new AnimatedSpriteTexture(spriteTexture, data.frames, data.frameDuration);
+        } catch (error) {
+          console.error("Errore nel caricamento dello spritesheet per " + data.name, error);
         }
-
-        function onWindowResize() {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-        }
-
-        function onMouseMove(event) {
-            const x = event.clientX;
-            const y = event.clientY;
-
-            cursor.style.left = `${x}px`;
-            cursor.style.top = `${y}px`;
-
-            gsap.to(cursorTrail1, { duration: 0.1, left: x, top: y });
-            gsap.to(cursorTrail2, { duration: 0.2, left: x, top: y });
-            gsap.to(cursorTrail3, { duration: 0.3, left: x, top: y });
-
-            // Aggiorna la posizione del mouse per il raycaster
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-            if (uniforms) {
-                uniforms.u_mouse.value.x = x / window.innerWidth;
-                uniforms.u_mouse.value.y = 1.0 - y / window.innerHeight;  // Inverti l'asse Y
-            }
-        }
-
-        function onMouseClick(event) {
-            if (symbolOverlay.classList.contains('visible')) return; // Evita interazioni quando l'overlay è aperto
-
-            event.preventDefault();
-
-            // Calcola la posizione del mouse in coordinate normalizzate del dispositivo (-1 a +1)
-            if (!isMobile) {
-                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-            } else {
-                // Posizione centrale per dispositivi mobili
-                mouse.x = 0;
-                mouse.y = 0;
-            }
-
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(symbols);
-
-            if (intersects.length > 0) {
-                const clickedSymbol = intersects[0].object;
-
-                // Mostra l'overlay con i dati del simbolo
-                showOverlay(clickedSymbol.userData);
-
-                // Oscura lo sfondo con il colore del simbolo
-                backgroundOverlay.style.backgroundColor = clickedSymbol.userData.color || 'rgba(0,0,0,0.5)';
-
-                // Centra il simbolo cliccato
-                centerSymbol(clickedSymbol);
-
-                // Attiva il cursore normale
-                document.body.classList.add('overlay-active');
-
-                // Nascondi l'info container
-                gsap.to(infoContainer, { duration: 0.5, opacity: 0, ease: 'power2.out' });
-            }
-        }
-
-        function showOverlay(data) {
-            // Popola l'immagine dell'overlay
-            document.getElementById('overlay-image').src = data.mainImage || '';
-
-            // Mostra l'overlay aggiungendo la classe 'visible'
-            symbolOverlay.classList.add('visible');
-        }
-
-        // Event listener per chiudere l'overlay
-        document.getElementById('close-overlay').addEventListener('click', function() {
-            symbolOverlay.classList.remove('visible');
-            backgroundOverlay.style.backgroundColor = 'transparent';
-            document.body.classList.remove('overlay-active');
-            // Reimposta la posizione della telecamera
-            resetCameraPosition();
-
-            // Ripristina l'info container
-            if (intersectedObject) {
-                gsap.to(infoContainer, { duration: 0.5, opacity: 1, ease: 'power2.out' });
-            }
+        
+        const symbolMaterial = new THREE.MeshBasicMaterial({
+          map: staticTexture,
+          transparent: true,
+          opacity: 1.0,
+          side: THREE.DoubleSide,
         });
 
-        // Chiudi l'overlay quando si clicca fuori dal contenuto
-        symbolOverlay.addEventListener('click', function(event) {
-            if (event.target === this) {
-                this.classList.remove('visible');
-                backgroundOverlay.style.backgroundColor = 'transparent';
-                document.body.classList.remove('overlay-active');
-                // Reimposta la posizione della telecamera
-                resetCameraPosition();
+        const symbolMesh = new THREE.Mesh(symbolGeometry, symbolMaterial);
+        symbolMesh.position.set(positions[i].x, positions[i].y, positions[i].z);
+        symbolMesh.lookAt(new THREE.Vector3(0, 0, 0));
 
-                // Ripristina l'info container
-                if (intersectedObject) {
-                    gsap.to(infoContainer, { duration: 0.5, opacity: 1, ease: 'power2.out' });
-                }
-            }
-        });
+        symbolMesh.userData = Object.assign({
+          name: data.name,
+          description: 'Descrizione dettagliata del simbolo ' + data.name,
+          image: data.image,
+          color: data.color || 'rgba(0,0,0,0.5)',
+          defaultTexture: staticTexture,
+          hoverTexture: animatedSprite
+        }, data.userData || {});
 
-        function centerSymbol(symbol) {
-            const targetPosition = symbol.position.clone();
-            const overlayWidth = window.innerWidth * 0.4;  // 40% dell'overlay che copre il lato destro
-            const visibleWidth = window.innerWidth - overlayWidth;  // La porzione visibile a sinistra
+        scene.add(symbolMesh);
+        symbols.push(symbolMesh);
+      }
+    }
 
-            // Calcola la distanza tra la telecamera e il simbolo
-            const distance = camera.position.distanceTo(targetPosition);
+    function onWindowResize() {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    }
 
-            // Ottieni il vettore destro della telecamera
-            const cameraRight = new THREE.Vector3();
-            camera.getWorldDirection(cameraRight);
-            cameraRight.crossVectors(camera.up, cameraRight).normalize();
+    function onMouseMove(event) {
+      const x = event.clientX;
+      const y = event.clientY;
+      cursor.style.left = `${x}px`;
+      cursor.style.top = `${y}px`;
+      gsap.to(cursorTrail1, { duration: 0.1, left: x, top: y });
+      gsap.to(cursorTrail2, { duration: 0.2, left: x, top: y });
+      gsap.to(cursorTrail3, { duration: 0.3, left: x, top: y });
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      if (uniforms) {
+        uniforms.u_mouse.value.x = x / window.innerWidth;
+        uniforms.u_mouse.value.y = 1.0 - y / window.innerHeight;
+      }
+    }
 
-            // Imposta la posizione NDC X desiderata per il centro della porzione visibile
-            const desiredNDCX = -0.5 * (visibleWidth / window.innerWidth); // -0.5 è il centro dello schermo, scalato per la parte visibile
+    function onMouseClick(event) {
+      if (symbolOverlay.classList.contains('visible')) return;
+      event.preventDefault();
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(symbols);
+      if (intersects.length > 0) {
+        const clickedSymbol = intersects[0].object;
+        showOverlay(clickedSymbol.userData);
+        backgroundOverlay.style.backgroundColor = clickedSymbol.userData.color || 'rgba(0,0,0,0.5)';
+        centerSymbol(clickedSymbol);
+        document.body.classList.add('overlay-active');
+        gsap.to(infoContainer, { duration: 0.5, opacity: 0, ease: 'power2.out' });
+      }
+    }
 
-            // Proietta la posizione del simbolo in coordinate NDC
-            const symbolScreenPosition = targetPosition.clone().project(camera);
+    function showOverlay(data) {
+      document.getElementById('overlay-image').src = data.mainImage || '';
+      symbolOverlay.classList.add('visible');
+    }
 
-            // Calcola la differenza in NDC
-            const deltaNDCX = symbolScreenPosition.x - desiredNDCX;
+    document.getElementById('close-overlay').addEventListener('click', function() {
+      symbolOverlay.classList.remove('visible');
+      backgroundOverlay.style.backgroundColor = 'transparent';
+      document.body.classList.remove('overlay-active');
+      resetCameraPosition();
+      if (intersectedObject) {
+        gsap.to(infoContainer, { duration: 0.5, opacity: 1, ease: 'power2.out' });
+      }
+    });
 
-            // Converti la differenza NDC in unità del mondo
-            const horizontalFOV = 2 * Math.atan(Math.tan(THREE.Math.degToRad(camera.fov) / 2) * camera.aspect);
-            const halfWidthAtDistance = Math.tan(horizontalFOV / 2) * distance;
-            const shiftWorldUnits = -deltaNDCX * halfWidthAtDistance;
-
-            // Calcola la nuova posizione della telecamera
-            const newCameraPosition = camera.position.clone().addScaledVector(cameraRight, shiftWorldUnits);
-
-            // Anima la posizione della telecamera
-            gsap.to(camera.position, {
-                x: newCameraPosition.x,
-                y: newCameraPosition.y,
-                z: newCameraPosition.z,
-                duration: 1,
-                onUpdate: function () {
-                    camera.lookAt(targetPosition);
-                    controls.update();
-                }
-            });
-
-            // Anima il target dei controlli
-            gsap.to(controls.target, {
-                x: targetPosition.x,
-                y: targetPosition.y,
-                z: targetPosition.z,
-                duration: 1,
-                onUpdate: function () {
-                    controls.update();
-                }
-            });
-
-            // Assicura che il simbolo guardi direttamente la telecamera
-            symbol.lookAt(camera.position);
-
-            // Anima l'ingrandimento del simbolo
-            gsap.to(symbol.scale, { x: 2, y: 2, z: 2, duration: 1 });
+    symbolOverlay.addEventListener('click', function(event) {
+      if (event.target === this) {
+        this.classList.remove('visible');
+        backgroundOverlay.style.backgroundColor = 'transparent';
+        document.body.classList.remove('overlay-active');
+        resetCameraPosition();
+        if (intersectedObject) {
+          gsap.to(infoContainer, { duration: 0.5, opacity: 1, ease: 'power2.out' });
         }
+      }
+    });
 
-        function resetCameraPosition() {
-            // Reimposta la posizione iniziale della telecamera
-            gsap.to(camera.position, {
-                x: -500,
-                y: -20,
-                z: 400,
-                duration: 1,
-                onUpdate: function() {
-                    controls.update();
-                }
-            });
-
-            gsap.to(controls.target, {
-                x: 0,
-                y: 0,
-                z: 0,
-                duration: 1,
-                onUpdate: function() {
-                    controls.update();
-                }
-            });
-
-            // Reimposta la scala del simbolo
-            if (intersectedObject) {
-                gsap.to(intersectedObject.scale, { x: 1, y: 1, z: 1, duration: 1 });
-            }
+    function centerSymbol(symbol) {
+      const targetPosition = symbol.position.clone();
+      const distance = 500;
+      const cameraDirection = new THREE.Vector3();
+      camera.getWorldDirection(cameraDirection);
+      const cameraRight = new THREE.Vector3();
+      cameraRight.crossVectors(camera.up, cameraDirection).normalize();
+      const screenWidth = window.innerWidth;
+      const verticalFOV = THREE.Math.degToRad(camera.fov);
+      const aspect = camera.aspect;
+      const horizontalFOV = 2 * Math.atan(Math.tan(verticalFOV / 2) * aspect);
+      const anglePerPixel = horizontalFOV / screenWidth;
+      const pixelOffset = 200;
+      const angleOffset = anglePerPixel * pixelOffset;
+      const shift = Math.tan(angleOffset) * distance;
+      const newCameraPosition = new THREE.Vector3().copy(targetPosition)
+        .addScaledVector(cameraDirection, -distance)
+        .addScaledVector(cameraRight, -shift);
+      gsap.to(camera.position, {
+        x: newCameraPosition.x,
+        y: newCameraPosition.y,
+        z: newCameraPosition.z,
+        duration: 1,
+        onUpdate: function() {
+          camera.lookAt(targetPosition);
+          controls.update();
         }
-
-        function checkIntersection() {
-            if (symbolOverlay.classList.contains('visible')) return;
-
-            if (isMobile) return; // Disabilita l'hover su dispositivi mobili
-
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(symbols);
-
-            if (intersects.length > 0) {
-                const object = intersects[0].object;
-                if (intersectedObject !== object) {
-                    if (intersectedObject) {
-                        gsap.to(intersectedObject.scale, { x: 1, y: 1, z: 1, duration: 0.5 });
-                    }
-                    intersectedObject = object;
-                    gsap.to(intersectedObject.scale, { x: 1.5, y: 1.5, z: 1.5, duration: 0.5 });
-
-                    // Aggiorna l'info container
-                    symbolNameElement.textContent = intersectedObject.userData.name;
-                    symbolDescriptionElement.textContent = intersectedObject.userData.description;
-                    gsap.to(infoContainer, { duration: 0.5, opacity: 1, ease: 'power2.out' });
-                }
-            } else {
-                if (intersectedObject) {
-                    gsap.to(intersectedObject.scale, { x: 1, y: 1, z: 1, duration: 0.5 });
-                    intersectedObject = null;
-
-                    // Nascondi l'info container
-                    gsap.to(infoContainer, { duration: 0.5, opacity: 0, ease: 'power2.out' });
-                }
-            }
+      });
+      gsap.to(controls.target, {
+        x: targetPosition.x,
+        y: targetPosition.y,
+        z: targetPosition.z,
+        duration: 1,
+        onUpdate: function() {
+          controls.update();
         }
+      });
+      symbol.lookAt(camera.position);
+    }
 
-        function animate() {
-            requestAnimationFrame(animate);
-
-            // Aggiungi una rotazione sull'asse Y
-            if (sphere) {
-                sphere.rotation.y += isMobile ? 0.002 : 0.0009;
-            }
-
-            // Aggiorna l'orientamento dei simboli per evitare distorsioni
-            symbols.forEach(symbol => {
-                symbol.lookAt(camera.position);
-            });
-
-            checkIntersection(); // Verifica le intersezioni con i simboli
-
-            controls.update();
-            renderer.render(scene, camera);
+    function resetCameraPosition() {
+      gsap.to(camera.position, {
+        x: -500,
+        y: -20,
+        z: 400,
+        duration: 1,
+        onUpdate: function() {
+          controls.update();
         }
-
-        init();
-    </script>
-
-    <!-- Vertex Shader senza deformazione -->
-    <script id="vertexShader" type="x-shader/x-vertex">
-        varying vec2 vUv;
-
-        void main() {
-            vUv = uv;
-
-            vec3 pos = position;
-
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      });
+      gsap.to(controls.target, {
+        x: 0,
+        y: 0,
+        z: 0,
+        duration: 1,
+        onUpdate: function() {
+          controls.update();
         }
-    </script>
+      });
+    }
 
-    <!-- Fragment Shader con effetto onda al passaggio del cursore sulla texture -->
-    <script id="fragmentShader" type="x-shader/x-fragment">
-        precision highp float;
-
-        uniform sampler2D u_texture;
-        uniform vec2 u_mouse;
-        varying vec2 vUv;
-
-        void main() {
-            vec2 uv = vUv;
-            vec2 mouse = vec2(u_mouse.x, 1.0 - u_mouse.y);
-
-            float dist = distance(uv, mouse);
-            float radius = 0.4;
-
-            float seamThreshold = 0.05;
-            float attenuation = 1.0;
-            if (uv.x < seamThreshold) {
-                attenuation = smoothstep(0.0, seamThreshold, uv.x);
-            } else if (uv.x > 1.0 - seamThreshold) {
-                attenuation = smoothstep(1.0, 1.0 - seamThreshold, uv.x);
+    function checkIntersection() {
+      if (symbolOverlay.classList.contains('visible')) return;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(symbols);
+      if (intersects.length > 0) {
+        const object = intersects[0].object;
+        if (intersectedObject !== object) {
+          if (intersectedObject) {
+            gsap.to(intersectedObject.scale, { x: 1, y: 1, z: 1, duration: 0.5 });
+            if (intersectedObject.userData.hoverTexture) {
+              intersectedObject.userData.hoverTexture.pause();
             }
-
-            if (dist < radius) {
-                float wave = sin((uv.x - mouse.x) * 15.0) * 0.06 * (1.0 - dist / radius);
-                wave *= attenuation;
-                uv.x += wave;
-                uv.y += wave;
-            }
-
-            vec4 color = texture2D(u_texture, uv);
-            gl_FragColor = color;
+            intersectedObject.material.map = intersectedObject.userData.defaultTexture;
+          }
+          intersectedObject = object;
+          gsap.to(intersectedObject.scale, { x: 1.5, y: 1.5, z: 1.5, duration: 0.5 });
+          if (intersectedObject.userData.hoverTexture) {
+            intersectedObject.userData.hoverTexture.play();
+            intersectedObject.material.map = intersectedObject.userData.hoverTexture.texture;
+          }
+          symbolNameElement.textContent = intersectedObject.userData.name;
+          symbolDescriptionElement.textContent = intersectedObject.userData.description;
+          gsap.to(infoContainer, { duration: 0.5, opacity: 1, ease: 'power2.out' });
         }
-    </script>
+      } else {
+        if (intersectedObject) {
+          gsap.to(intersectedObject.scale, { x: 1, y: 1, z: 1, duration: 0.5 });
+          if (intersectedObject.userData.hoverTexture) {
+            intersectedObject.userData.hoverTexture.pause();
+          }
+          intersectedObject.material.map = intersectedObject.userData.defaultTexture;
+          intersectedObject = null;
+          gsap.to(infoContainer, { duration: 0.5, opacity: 0, ease: 'power2.out' });
+        }
+      }
+    }
+
+    let previousTime = performance.now();
+    function animate() {
+      requestAnimationFrame(animate);
+      const currentTime = performance.now();
+      const deltaTime = (currentTime - previousTime) / 1000;
+      previousTime = currentTime;
+      // Aggiorna lo sprite animato per ogni simbolo in hover
+      for (let mesh of symbols) {
+        const animSprite = mesh.userData.hoverTexture;
+        if (animSprite && animSprite.isPlaying) {
+          animSprite.update(deltaTime);
+        }
+      }
+      if (sphere) {
+        sphere.rotation.y += 0.0004;
+      }
+      checkIntersection();
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    function init() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.getElementById('container').appendChild(renderer.domElement);
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+
+      const textureLoader = new THREE.TextureLoader();
+      textureLoader.crossOrigin = '';
+      textureLoader.load(
+        'Sfumatura-lr.jpg',
+        function (texture) {
+          texture.wrapS = THREE.ClampToEdgeWrapping;
+          texture.wrapT = THREE.ClampToEdgeWrapping;
+          texture.minFilter = THREE.LinearFilter;
+          uniforms = {
+            u_texture: { value: texture },
+            u_mouse: { value: new THREE.Vector2(0, 0) }
+          };
+          const geometry = new THREE.SphereGeometry(700, 228, 228);
+          const material = new THREE.ShaderMaterial({
+            uniforms: uniforms,
+            vertexShader: document.getElementById('vertexShader').textContent,
+            fragmentShader: document.getElementById('fragmentShader').textContent,
+            side: THREE.DoubleSide
+          });
+          sphere = new THREE.Mesh(geometry, material);
+          scene.add(sphere);
+        },
+        undefined,
+        function (err) {
+          console.error('Errore nel caricamento della sfumatura.', err);
+        }
+      );
+
+      camera.position.set(-500, 300, 400);
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 1.75;
+      controls.enableZoom = true;
+      controls.enablePan = true;
+      controls.minDistance = 70;
+      controls.maxDistance = 70;
+
+      // Aggiunta per nascondere istruzioni anche con trackpad (evento 'start' di OrbitControls)
+      controls.addEventListener('start', hideInstructions, { once: true });
+
+      window.addEventListener('resize', onWindowResize, false);
+      document.addEventListener('mousemove', onMouseMove, false);
+      document.addEventListener('click', onMouseClick, false);
+
+      addSymbolsInsideSphere().then(() => {
+        onWindowResize();
+        animate();
+      });
+    }
+    init();
+  </script>
+
+  <!-- Vertex Shader (senza deformazione) -->
+  <script id="vertexShader" type="x-shader/x-vertex">
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      vec3 pos = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+  </script>
+
+  <!-- Fragment Shader con effetto onda al passaggio del cursore -->
+  <script id="fragmentShader" type="x-shader/x-fragment">
+    precision highp float;
+    uniform sampler2D u_texture;
+    uniform vec2 u_mouse;
+    varying vec2 vUv;
+    void main() {
+      vec2 uv = vUv;
+      vec2 mouse = vec2(u_mouse.x, 1.0 - u_mouse.y);
+      float dist = distance(uv, mouse);
+      float radius = 0.4;
+      float seamThreshold = 0.05;
+      float attenuation = 1.0;
+      if (uv.x < seamThreshold) {
+        attenuation = smoothstep(0.0, seamThreshold, uv.x);
+      } else if (uv.x > 1.0 - seamThreshold) {
+        attenuation = smoothstep(1.0, 1.0 - seamThreshold, uv.x);
+      }
+      if (dist < radius) {
+        float wave = sin((uv.x - mouse.x) * 15.0) * 0.06 * (1.0 - dist / radius);
+        wave *= attenuation;
+        uv.x += wave;
+        uv.y += wave;
+      }
+      vec4 color = texture2D(u_texture, uv);
+      gl_FragColor = color;
+    }
+  </script>
 </body>
 </html>
