@@ -1572,3 +1572,1577 @@
   </script>
 </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EGO EMOTIONS</title>
+  <style>
+    :root {
+      /* Modifica questo valore per cambiare il margine inferiore della GIF */
+      --instructions-gif-margin-bottom: 10px;
+    }
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+
+    /* Includi il font Neue Haas Unica W1G */
+    @font-face {
+      font-family: 'Neue Haas Unica W1G';
+      src: url('fonts/NeueHaasUnicaW1G-Regular.woff2') format('woff2'),
+           url('fonts/NeueHaasUnicaW1G-Regular.woff') format('woff');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    /* ===================== Preloader Styles ===================== */
+    #preloader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #00143A;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 10000;
+    }
+    .loader-circle {
+      width: 30px;
+      height: 30px;
+      border: 2px solid transparent;
+      border-top: 2px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    #loader-text {
+      color: white;
+      font-family: 'Neue Haas Unica W1G', Arial, sans-serif;
+      font-size: 50px;
+      opacity: 0;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    /* ============================================================ */
+
+    .cursor, .cursor-trail {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      background: radial-gradient(circle, rgba(255,255,255,0.8), rgba(255,255,255,0));
+      border-radius: 50%;
+      pointer-events: none;
+      mix-blend-mode: screen;
+      transform: translate(-50%, -50%);
+    }
+    .cursor-trail {
+      width: 90px;
+      height: 0px;
+      opacity: 0.8;
+    }
+
+    /* Stili per il contenitore delle informazioni */
+    #info-container {
+      position: absolute;
+      bottom: 50px;
+      width: 100%;
+      text-align: center;
+      color: white;
+      font-family: 'Neue Haas Unica W1G', Arial, sans-serif;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    #symbol-info {
+      /* LASCIARE display:flex per poter allungare le linee ai lati */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%; /* Occupiamo tutta la larghezza */
+    }
+
+    /* MODIFICA 3: le linee diventano “al vivo”, flex:1 per allungarle */
+    .decorative-line {
+      flex: 1;
+      height: 2px;
+      background-color: white;
+      margin: 0; /* Niente margini, così toccano i bordi */
+    }
+
+    /* MODIFICA 1 e 2: riduci font-size e margine */
+    #symbol-name {
+      font-size: 50px; /* era 80px */
+      font-weight: bold;
+      text-transform: uppercase;
+      display: inline-block;
+      margin: 0 20px; /* piccolo margine orizzontale per separarlo dalle linee */
+    }
+    #symbol-description {
+      font-size: 20px; /* era 30px */
+      margin-top: 10px; /* margine più piccolo */
+    }
+
+    /* Stili per l'overlay */
+    #symbol-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      visibility: hidden;
+      z-index: 1000;
+      transition: opacity 0.5s ease-in-out;
+      pointer-events: none;
+    }
+    #symbol-overlay.visible {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    /* Overlay colorato per oscurare la pagina */
+    #background-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: transparent;
+      z-index: 900;
+      pointer-events: none;
+      transition: background-color 0.5s ease-in-out;
+    }
+
+    /* Overlay contenuto (scheda overlay a destra, 40% dello schermo) */
+    #overlay-content {
+      position: absolute;
+      top: 0;
+      right: -40%;
+      width: 40%;
+      height: 100%;
+      background-color: #fff;
+      overflow-y: auto;
+      padding: 40px;
+      box-sizing: border-box;
+      transition: right 0.5s ease-in-out;
+      font-family: 'Neue Haas Unica W1G', Arial, sans-serif;
+    }
+    #symbol-overlay.visible #overlay-content {
+      right: 0;
+    }
+
+    #close-overlay {
+      position: absolute;
+      top: 50px;
+      right: 50px;
+      font-size: 100px;
+      font-weight: bold;
+      color: black;
+      cursor: pointer;
+    }
+
+    /* Nuovo elemento: area sinistra per mostrare l'immagine PNG del simbolo */
+    #overlay-symbol {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 60%;
+      height: 100%;
+      z-index: 950;
+      display: none;
+      /* Centra l'immagine con flexbox */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+    }
+    #overlay-symbol img {
+      width: 25%;
+      height: auto;
+      object-fit: contain;
+    }
+
+    /* Nuovo elemento: scheda tecnica (area overlay destra) */
+    #overlay-sheet {
+      margin-top: 20px;
+      font-family: Arial, sans-serif;
+      color: #333;
+    }
+
+    /* Immagine all'interno dell'overlay (scheda a destra) */
+    #overlay-image {
+      width: 100%;
+      height: auto;
+      object-fit: cover;
+    }
+
+    /* Mostra il cursore quando l'overlay è visibile */
+    body.overlay-active {
+      cursor: default;
+    }
+
+    /* ---------- Nuovo CSS per il menu (bottone + overlay) ---------- */
+    #menu-button {
+      position: absolute;
+      top: 60px;
+      left: 60px;
+      z-index: 9999;
+      background: transparent;
+      color: #fff;
+      padding: 10px 25px;
+      border: 1px solid #fff;
+      border-radius: 40px;
+      cursor: pointer;
+      font-size: 18px;
+    }
+    #menu-button:hover {
+      background: #fff;
+      color: #000;
+    }
+    #menu-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #fff;
+      color: #000;
+      z-index: 9998;
+      display: none;
+      overflow-y: auto;
+      padding: 20px;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+    #menu-overlay.visible {
+      display: block;
+    }
+    #close-menu {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: transparent;
+      color: #00143A;
+      padding: 10px 25px;
+      border: 1px solid #00143A;
+      border-radius: 40px;
+      cursor: pointer;
+      font-size: 18px;
+    }
+    #close-menu:hover {
+      background: #00143A;
+      color: #fff;
+    }
+
+    /* ---------- Istruzioni in basso (dimensioni testo dimezzate) ---------- */
+    #instructions {
+      position: absolute;
+      bottom: 100px;
+      width: 100%;
+      text-align: center;
+      color: white;
+      font-family: 'Neue Haas Unica W1G', Arial, sans-serif;
+      pointer-events: none;
+      opacity: 1;
+      transition: opacity 0.5s;
+      z-index: 9999;
+    }
+    #instructions h1 {
+      font-size: 35px;  
+      margin-bottom: 5px;
+    }
+    #instructions p {
+      font-size: 12px; 
+      margin: 0px;
+    }
+    #instructions-gif {
+      transform: scale(0.12);
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      margin-bottom: -230px !important;
+    }
+
+    /* ======================
+       NUOVO BLOCCO STILI 
+       per la pagina di apertura del menu 
+       ====================== */
+    #ego-newcom-page {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      font-family: 'Neue Haas Unica W1G', Arial, sans-serif;
+    }
+    #en-title {
+      position: relative;
+      top: 1vh;
+      left: 4vw;
+      font-size: 3.9vw;
+      max-width: 70vw;
+      line-height: 1;
+    }
+    #en-paragraph {
+      position: absolute;
+      top: 18vh;
+      left: 30vw;
+      right: 4vw;
+      font-size: 1.3vw;
+      line-height: 1.2;
+    }
+    #en-line1 {
+      position: absolute;
+      left: 4vw;
+      right: 4vw;
+      height: 0.08vh;
+      top: calc(13.7vh + 3.2vh + 2.9vw + 9.7vh + 1.2vw);
+      background-color: #000;
+      opacity: 0.3;
+    }
+    #en-subtitle {
+      position: absolute;
+      top: calc(13.7vh + 3.2vh + 2.9vw + 9.7vh + 1.2vw + 0.05vh);
+      left: 4vw;
+      font-size: 1vw;
+      font-weight: lighter;
+    }
+    #en-grid {
+      position: absolute;
+      top: calc(13.7vh + 3.2vh + 2.9vw + 9.7vh + 1.2vw + 0.05vh + 2.5vh + 5vh);
+      left: 4vw;
+      right: 4vw;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-auto-rows: auto;
+      gap: 3vh 3vw;
+    }
+    .en-grid-item {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    .en-grid-item img {
+      width: 6vw;
+      height: auto;
+    }
+    .en-grid-item span {
+      margin-left: 1vw;
+      font-size: 1vw;
+    }
+    #en-line2 {
+      position: absolute;
+      left: 4vw;
+      right: 4vw;
+      height: 0.08vh;
+      background-color: #000;
+      opacity: 0.3;
+      bottom: 6vh;
+    }
+    #en-footer {
+      position: absolute;
+      left: 4vw;
+      right: 4vw;
+      bottom: 2vh;
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8vw;
+    }
+    #en-footer-left, #en-footer-right {
+      white-space: nowrap;
+    }
+
+    /* ========= RESPONSIVE MEDIA QUERIES PER IL MENU ========= */
+    @media (max-width: 1200px) {
+      #en-title {
+        font-size: 4.5vw;
+        top: 2vh;
+        left: 5vw;
+        max-width: 65vw;
+      }
+      #en-paragraph {
+        font-size: 1.5vw;
+        top: 22vh;
+        left: 32vw;
+        right: 5vw;
+      }
+      #en-line1 {
+        top: calc(15vh);
+      }
+      #en-subtitle {
+        font-size: 1.2vw;
+        top: calc(15.5vh);
+      }
+      #en-grid {
+        gap: 2.5vh 2.5vw;
+      }
+      .en-grid-item img {
+        width: 7vw;
+      }
+      .en-grid-item span {
+        font-size: 1.2vw;
+      }
+      #en-line2 {
+        bottom: 6vh;
+      }
+      #en-footer {
+        font-size: 0.9vw;
+        bottom: 3vh;
+      }
+    }
+    @media (max-width: 992px) {
+      #en-title {
+        font-size: 5vw;
+        top: 2.5vh;
+        left: 5vw;
+        max-width: 70vw;
+      }
+      #en-paragraph {
+        font-size: 1.8vw;
+        top: 24vh;
+        left: 30vw;
+        right: 5vw;
+      }
+      #en-line1 {
+        top: calc(16vh);
+      }
+      #en-subtitle {
+        font-size: 1.4vw;
+        top: calc(16.5vh);
+      }
+      #en-grid {
+        gap: 3vh 3vw;
+      }
+      .en-grid-item img {
+        width: 8vw;
+      }
+      .en-grid-item span {
+        font-size: 1.4vw;
+      }
+      #en-line2 {
+        bottom: 5vh;
+      }
+      #en-footer {
+        font-size: 1vw;
+        bottom: 2vh;
+      }
+    }
+    @media (max-width: 768px) {
+      #en-title {
+        font-size: 6vw;
+        top: 3vh;
+        left: 4vw;
+        max-width: 75vw;
+      }
+      #en-paragraph {
+        font-size: 2vw;
+        top: 26vh;
+        left: 28vw;
+        right: 4vw;
+      }
+      #en-line1 {
+        top: calc(17vh);
+      }
+      #en-subtitle {
+        font-size: 1.6vw;
+        top: calc(17.5vh);
+      }
+      #en-grid {
+        gap: 3.5vh 3.5vw;
+      }
+      .en-grid-item img {
+        width: 10vw;
+      }
+      .en-grid-item span {
+        font-size: 1.6vw;
+      }
+      #en-line2 {
+        bottom: 4vh;
+      }
+      #en-footer {
+        font-size: 1.2vw;
+        bottom: 1.5vh;
+      }
+    }
+    @media (max-width: 576px) {
+      #en-title {
+        font-size: 7vw;
+        top: 4vh;
+        left: 3vw;
+        max-width: 80vw;
+      }
+      #en-paragraph {
+        font-size: 2.5vw;
+        top: 30vh;
+        left: 25vw;
+        right: 3vw;
+      }
+      #en-line1 {
+        top: calc(20vh);
+      }
+      #en-subtitle {
+        font-size: 1.8vw;
+        top: calc(20.5vh);
+      }
+      #en-grid {
+        gap: 4vh 4vw;
+      }
+      .en-grid-item img {
+        width: 12vw;
+      }
+      .en-grid-item span {
+        font-size: 2vw;
+      }
+      #en-line2 {
+        bottom: 3vh;
+      }
+      #en-footer {
+        font-size: 1.4vw;
+        bottom: 1vh;
+      }
+    }
+    /* ========= FINE NUOVI BREAKPOINT ========= */
+  </style>
+</head>
+<body>
+  <!-- Preloader -->
+  <div id="preloader">
+    <div class="loader-circle"></div>
+    <div id="loader-text">Introducing...</div>
+  </div>
+
+  <!-- Bottone menu (testo “All emotions”) -->
+  <button id="menu-button">All emotions</button>
+
+  <!-- Overlay menu -->
+  <div id="menu-overlay">
+    <button id="close-menu">Close</button>
+    <div id="ego-newcom-page">
+      <h1 id="en-title">Benvenuti nel mondo delle emozioni di EGO NewCom</h1>
+      <p id="en-paragraph">
+        Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, 
+        totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta 
+        sunt explicabo. Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.
+      </p>
+      <div id="en-line1"></div>
+      <h2 id="en-subtitle">// SCOPRI LE EMOZIONI CHE CI GUIDANO</h2>
+      <div id="en-grid">
+        <div class="en-grid-item">
+          <img src="Empatia-nero.png" alt="Empatia">
+          <span>Empatia</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Abbraccio-nero.png" alt="Abbraccio">
+          <span>Abbraccio</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Accoglienza-nero.png" alt="Accoglienza">
+          <span>Accoglienza</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Autenticita-nero.png" alt="Autenticità">
+          <span>Autenticità</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Cafune-nero.png" alt="Cafunè">
+          <span>Cafunè</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Comprensione-nero.png" alt="Comprensione">
+          <span>Comprensione</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Curiosita-nero.png" alt="Curiosità">
+          <span>Curiosità</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Fiducia-nero.png" alt="Fiducia">
+          <span>Fiducia</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Gioia-condivisa-nero.png" alt="Gioia Condivisa">
+          <span>Gioia Condivisa</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Evoluzione-nero.png" alt="Evoluzione">
+          <span>Evoluzione</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Protezione-nero.png" alt="Protezione">
+          <span>Protezione</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Rame-nero.png" alt="Ramè">
+          <span>Ramè</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Rispetto-nero.png" alt="Rispetto">
+          <span>Rispetto</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Meraviglia-nero.png" alt="Meraviglia">
+          <span>Meraviglia</span>
+        </div>
+        <div class="en-grid-item">
+          <img src="Mono-no-aware-nero.png" alt="Mono No Aware">
+          <span>Mono No Aware</span>
+        </div>
+      </div>
+      <div id="en-line2"></div>
+      <div id="en-footer">
+        <div id="en-footer-left">2017 © Ego NewCom S.A.S - P.IVA: 03714320045</div>
+        <div id="en-footer-right">Linkedin Facebook Youtube Instagram</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Blocco istruzioni: appare al caricamento e scompare al primo movimento -->
+  <div id="instructions">
+    <img id="instructions-gif" src="Mano-INTRO.gif" alt="Instructions GIF" style="margin-bottom: 15px;">
+    <h1>Drag to explore our world</h1>
+    <p>Trascina per muovere la visuale oppure usa i tasti WASD o le frecce per navigare nell'ambiente immersivo.</p>
+  </div>
+
+  <div id="container"></div>
+
+  <!-- Nuovo elemento per mostrare l'immagine PNG del simbolo selezionato nella porzione sinistra (60%) -->
+  <div id="overlay-symbol"></div>
+
+  <div id="cursor" class="cursor"></div>
+  <div id="cursor-trail-1" class="cursor-trail"></div>
+  <div id="cursor-trail-2" class="cursor-trail"></div>
+  <div id="cursor-trail-3" class="cursor-trail"></div>
+
+  <!-- Contenitore delle informazioni -->
+  <div id="info-container">
+    <div id="symbol-info">
+      <div class="decorative-line"></div>
+      <div id="symbol-name"></div>
+      <div class="decorative-line"></div>
+    </div>
+    <div id="symbol-description"></div>
+  </div>
+
+  <!-- Overlay colorato per oscurare la pagina -->
+  <div id="background-overlay"></div>
+
+  <!-- Overlay per il contenuto dei simboli (scheda overlay a destra, 40% dello schermo) -->
+  <div id="symbol-overlay">
+    <div id="overlay-content">
+      <span id="close-overlay">&times;</span>
+      <!-- Immagine della scheda overlay (mainImage) -->
+      <img id="overlay-image" src="URL_DELLA_TUA_IMMAGINE.jpg" alt="Symbol Image">
+      <!-- Scheda tecnica: modifica i dettagli direttamente in symbolData -->
+      <div id="overlay-sheet"></div>
+    </div>
+  </div>
+
+  <!-- Three.js, OrbitControls e GSAP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+
+  <script>
+    // Variabile globale per regolare l'alpha (trasparenza) dell'overlay – attualmente 0.1 (10%)
+    const overlayAlpha = 0.1;
+
+    // Funzione che converte un colore in qualsiasi formato (#hex, rgb(), rgba()) in un oggetto {r, g, b}
+    // e poi lo restituisce come rgba(r,g,b, alpha).
+    function convertToRgba(colorStr, alpha) {
+      // Se già in rgba, lo parse e sostituisce l'alpha
+      if (colorStr.startsWith("rgba(")) {
+        let parts = colorStr.slice(5, -1).split(",");
+        let r = parseInt(parts[0]);
+        let g = parseInt(parts[1]);
+        let b = parseInt(parts[2]);
+        return `rgba(${r},${g},${b},${alpha})`;
+      }
+      // Se in formato rgb(), parse e aggiunge alpha
+      if (colorStr.startsWith("rgb(")) {
+        let parts = colorStr.slice(4, -1).split(",");
+        let r = parseInt(parts[0]);
+        let g = parseInt(parts[1]);
+        let b = parseInt(parts[2]);
+        return `rgba(${r},${g},${b},${alpha})`;
+      }
+      // Se in formato #hex
+      if (colorStr.startsWith("#")) {
+        // Rimuove il "#"
+        let hex = colorStr.substring(1);
+        // Supporta formati #RGB, #RGBA, #RRGGBB, #RRGGBBAA
+        if (hex.length === 3) {
+          // #RGB
+          let r = parseInt(hex[0] + hex[0], 16);
+          let g = parseInt(hex[1] + hex[1], 16);
+          let b = parseInt(hex[2] + hex[2], 16);
+          return `rgba(${r},${g},${b},${alpha})`;
+        } else if (hex.length === 4) {
+          // #RGBA
+          let r = parseInt(hex[0] + hex[0], 16);
+          let g = parseInt(hex[1] + hex[1], 16);
+          let b = parseInt(hex[2] + hex[2], 16);
+          // ignora la parte alpha hex[3], usiamo alpha globale
+          return `rgba(${r},${g},${b},${alpha})`;
+        } else if (hex.length === 6 || hex.length === 8) {
+          // #RRGGBB o #RRGGBBAA
+          let r = parseInt(hex.substring(0,2), 16);
+          let g = parseInt(hex.substring(2,4), 16);
+          let b = parseInt(hex.substring(4,6), 16);
+          // se c'è AA la ignoriamo, usiamo alpha globale
+          return `rgba(${r},${g},${b},${alpha})`;
+        }
+      }
+      // Altrimenti fallback
+      return `rgba(0,0,0,${alpha})`;
+    }
+
+    if (location.protocol === "file:") {
+      console.warn("Esegui il file tramite un server locale per evitare problemi con CORS.");
+    }
+
+    let scene, camera, renderer, sphere, controls, uniforms, raycaster, mouse;
+    let intersectedObject;
+    const symbols = [];
+    const cursor = document.getElementById('cursor');
+    const cursorTrail1 = document.getElementById('cursor-trail-1');
+    const cursorTrail2 = document.getElementById('cursor-trail-2');
+    const cursorTrail3 = document.getElementById('cursor-trail-3');
+
+    const infoContainer = document.getElementById('info-container');
+    const symbolNameElement = document.getElementById('symbol-name');
+    const symbolDescriptionElement = document.getElementById('symbol-description');
+
+    const backgroundOverlay = document.getElementById('background-overlay');
+    const symbolOverlay = document.getElementById('symbol-overlay');
+    const overlaySymbol = document.getElementById('overlay-symbol');
+
+    // ---------- Nuovo codice per il menu ----------
+    const menuButton = document.getElementById('menu-button');
+    const menuOverlay = document.getElementById('menu-overlay');
+    const closeMenu = document.getElementById('close-menu');
+
+    menuButton.addEventListener('click', () => {
+      menuOverlay.classList.add('visible');
+      menuButton.style.display = "none";
+    });
+    closeMenu.addEventListener('click', () => {
+      menuOverlay.classList.remove('visible');
+      menuButton.style.display = "block";
+    });
+    // ---------- Fine menu ----------
+
+    // ---------- Istruzioni in basso ----------
+    const instructions = document.getElementById('instructions');
+    let instructionsVisible = true;
+    function hideInstructions() {
+      if (!instructionsVisible) return;
+      instructionsVisible = false;
+      gsap.to(instructions, {
+        duration: 0.8,
+        opacity: 0,
+        onComplete: () => { instructions.style.display = 'none'; }
+      });
+    }
+    document.addEventListener('mousedown', hideInstructions, { once: true });
+    document.addEventListener('touchstart', hideInstructions, { once: true });
+    // ---------- Fine istruzioni ----------
+
+    // ======================================================
+    // 1) Classe AnimatedSpriteTexture (spritesheet con NearestFilter)
+    // ======================================================
+    class AnimatedSpriteTexture {
+      constructor(texture, frames, frameDuration) {
+        this.texture = texture;
+        this.frames = frames;
+        this.frameDuration = frameDuration;
+        this.currentFrame = 0;
+        this.accumulator = 0;
+        this.isPlaying = false;
+        texture.repeat.set(1 / frames, 1);
+        texture.offset.set(0, 0);
+        texture.minFilter = THREE.NearestFilter;
+        texture.magFilter = THREE.NearestFilter;
+        texture.needsUpdate = true;
+      }
+      play() {
+        this.isPlaying = true;
+        this.currentFrame = 0;
+        this.accumulator = 0;
+        this.texture.offset.set(0, 0);
+        this.texture.needsUpdate = true;
+      }
+      pause() {
+        this.isPlaying = false;
+      }
+      update(deltaTime) {
+        if (!this.isPlaying) return;
+        this.accumulator += deltaTime * 1000;
+        if (this.accumulator >= this.frameDuration) {
+          this.accumulator = 0;
+          this.currentFrame = (this.currentFrame + 1) % this.frames;
+          this.texture.offset.x = this.currentFrame / this.frames;
+          this.texture.needsUpdate = true;
+        }
+      }
+    }
+
+    let pivot;
+    const keyState = {};
+
+    document.addEventListener('keydown', function(event) {
+      keyState[event.code] = true;
+      controls.enabled = false;
+    });
+    document.addEventListener('keyup', function(event) {
+      keyState[event.code] = false;
+      controls.enabled = true;
+    });
+
+    let previousTouchMidpoint = null;
+    document.addEventListener('touchstart', function(e) {
+      if (e.touches.length >= 2) {
+        let x = 0, y = 0;
+        for (let i = 0; i < e.touches.length; i++) {
+          x += e.touches[i].clientX;
+          y += e.touches[i].clientY;
+        }
+        previousTouchMidpoint = { x: x / e.touches.length, y: y / e.touches.length };
+      }
+    }, false);
+    document.addEventListener('touchmove', function(e) {
+      if (e.touches.length >= 2 && previousTouchMidpoint) {
+        let x = 0, y = 0;
+        for (let i = 0; i < e.touches.length; i++) {
+          x += e.touches[i].clientX;
+          y += e.touches[i].clientY;
+        }
+        let currentMidpoint = { x: x / e.touches.length, y: y / e.touches.length };
+        let dx = currentMidpoint.x - previousTouchMidpoint.x;
+        let dy = currentMidpoint.y - previousTouchMidpoint.y;
+        const factor = 0.005;
+        pivot.rotation.y -= dx * factor;
+        pivot.rotation.x -= dy * factor;
+        pivot.rotation.x = Math.max(-Math.PI/4, Math.min(Math.PI/4, pivot.rotation.x));
+        previousTouchMidpoint = currentMidpoint;
+      }
+    }, false);
+    document.addEventListener('touchend', function(e) {
+      if (e.touches.length < 2) {
+        previousTouchMidpoint = null;
+      }
+    }, false);
+
+    async function addSymbolsInsideSphere() {
+      const loader = new THREE.TextureLoader();
+
+      /*
+        symbolData: per ogni simbolo,
+        - "texture" e "hoverSpritesheet" definiscono le immagini di base e animata
+        - "image" (fuori da userData) -> immagine per l'area sinistra
+        - "mainImage" (dentro userData) -> immagine per la scheda overlay (area destra)
+        - "color" -> colore per background (usato per l'overlay)
+      */
+      const symbolData = [
+        { 
+          texture: 'Rame.png', 
+          hoverSpritesheet: 'Rame-spritesheet.png',
+          frames: 25,
+          frameDuration: 30,
+          name: 'Ramè', 
+          color: '#664C9A', 
+          image: 'Rame.png',
+          userData: {
+            mainImage: 'RameOverlay.png'
+          }
+        },
+        { 
+          texture: 'Cafune.png', 
+          hoverSpritesheet: 'Cafune-spritesheet.png',
+          frames: 63,
+          frameDuration: 30,
+          name: 'Cafunè', 
+          color: '#E4408F', 
+          image: 'Cafune.png',
+          userData: {
+            chapter: '...',
+            title: 'Cafunè',
+            mainImage: 'CafuneOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalCafune.png',
+            imageDescription: 'Descrizione di Cafunè',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Empatia.png', 
+          hoverSpritesheet: 'Empatia-spritesheet.png',
+          frames: 42,
+          frameDuration: 30,
+          name: 'Empatia', 
+          color: '#94C9E2', 
+          image: 'Empatia.png',
+          userData: {
+            chapter: '...',
+            title: 'Empatia',
+            mainImage: 'EmpatiaOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalEmpatia.png',
+            imageDescription: 'Descrizione di Empatia',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Meraviglia.png', 
+          hoverSpritesheet: 'Meraviglia-spritesheet.png',
+          frames: 6,
+          frameDuration: 30,
+          name: 'Meraviglia', 
+          color: '#CCB2E0', 
+          image: 'Meraviglia.png',
+          userData: {
+            chapter: '...',
+            title: 'Meraviglia',
+            mainImage: 'MeravigliaOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalMeraviglia.png',
+            imageDescription: 'Descrizione di Meraviglia',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Protezione.png', 
+          hoverSpritesheet: 'Protezione-spritesheet2.png',
+          frames: 27,
+          frameDuration: 30,
+          name: 'Protezione', 
+          color: 'rgba(69, 99, 172, 0.35)', 
+          image: 'Protezione.png',
+          userData: {
+            chapter: '...',
+            title: 'Protezione',
+            mainImage: 'ProtezioneOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalProtezione.png',
+            imageDescription: 'Descrizione di Protezione',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Abbraccio.png', 
+          hoverSpritesheet: 'Abbraccio-spritesheet.png',
+          frames: 17,
+          frameDuration: 30,
+          name: 'Abbraccio', 
+          color: '#EABCC8', 
+          image: 'Abbraccio.png',
+          userData: {
+            chapter: '...',
+            title: 'Abbraccio',
+            mainImage: 'AbbraccioOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalAbbraccio.png',
+            imageDescription: 'Descrizione di Abbraccio',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Gioia-condivisa.png', 
+          hoverSpritesheet: 'Gioia-condivisa-spritesheet.png',
+          frames: 17,
+          frameDuration: 30,
+          name: 'Gioia condivisa', 
+          color: '#F27319', 
+          image: 'GioiaCondivisa.png',
+          userData: {
+            chapter: '...',
+            title: 'Gioia Condivisa',
+            mainImage: 'Gioia-CondivisaOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalGioiaCondivisa.png',
+            imageDescription: 'Descrizione di Gioia Condivisa',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Autenticita.png', 
+          hoverSpritesheet: 'Autenticita-spritesheet.png',
+          frames: 13,
+          frameDuration: 60,
+          name: 'Autenticità', 
+          color: '#CEEA31', 
+          image: 'Autenticita.png',
+          userData: {
+            chapter: '...',
+            title: 'Autenticità',
+            mainImage: 'AutenticitaOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalAutenticita.png',
+            imageDescription: 'Descrizione di Autenticità',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Comprensione.png', 
+          hoverSpritesheet: 'Comprensione-spritesheet.png',
+          frames: 26,
+          frameDuration: 30,
+          name: 'Comprensione', 
+          color: '#0BC9C4', 
+          image: 'Comprensione.png',
+          userData: {
+            chapter: '...',
+            title: 'Comprensione',
+            mainImage: 'ComprensioneOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalComprensione.png',
+            imageDescription: 'Descrizione di Comprensione',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Rispetto.png', 
+          hoverSpritesheet: 'Rispetto-spritesheet.png',
+          frames: 6,
+          frameDuration: 120,
+          name: 'Rispetto', 
+          color: '#FFD64A', 
+          image: 'Rispetto.png',
+          userData: {
+            chapter: '...',
+            title: 'Rispetto',
+            mainImage: 'RispettoOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalRispetto.png',
+            imageDescription: 'Descrizione di Rispetto',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Accoglienza.png', 
+          hoverSpritesheet: 'Accoglienza-spritesheet.png',
+          frames: 33,
+          frameDuration: 30,
+          name: 'Accoglienza', 
+          color: '#A1154A', 
+          image: 'Accoglienza.png',
+          userData: {
+            chapter: '...',
+            title: 'Accoglienza',
+            mainImage: 'AccoglienzaOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalAccoglienza.png',
+            imageDescription: 'Descrizione di Accoglienza',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Mono-No-Aware.png', 
+          hoverSpritesheet: 'MonoNoAware-spritesheet.png',
+          frames: 25,
+          frameDuration: 30,
+          name: 'Mono No Aware', 
+          color: '#018E39', 
+          image: 'Mono-No-Aware.png',
+          userData: {
+            chapter: '...',
+            title: 'Mono No Aware',
+            mainImage: 'MonoNoAwareOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalMonoNoAware.png',
+            imageDescription: 'Descrizione di Mono No Aware',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Fiducia.png', 
+          hoverSpritesheet: 'Fiducia-spritesheet.png',
+          frames: 15,
+          frameDuration: 40,
+          name: 'Fiducia', 
+          color: '#000080', 
+          image: 'Fiducia.png',
+          userData: {
+            chapter: '...',
+            title: 'Fiducia',
+            mainImage: 'FiduciaOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalFiducia.png',
+            imageDescription: 'Descrizione di Fiducia',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Curiosita.png', 
+          hoverSpritesheet: 'Curiosita-spritesheet.png',
+          frames: 17,
+          frameDuration: 40,
+          name: 'Curiosità', 
+          color: '#007C94', 
+          image: 'Curiosita.png',
+          userData: {
+            chapter: '...',
+            title: 'Curiosità',
+            mainImage: 'CuriositaOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalCuriosita.png',
+            imageDescription: 'Descrizione di Curiosità',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        },
+        { 
+          texture: 'Evoluzione.png', 
+          hoverSpritesheet: 'Evoluzione-spritesheet2.png',
+          frames: 18,
+          frameDuration: 30,
+          name: 'Evoluzione', 
+          color: '#CA2618', 
+          image: 'Evoluzione.png',
+          userData: {
+            chapter: '...',
+            title: 'Evoluzione',
+            mainImage: 'EvoluzioneOverlay.png',
+            text1: 'Lorem ipsum dolor sit amet...',
+            additionalImage: 'images/AdditionalEvoluzione.png',
+            imageDescription: 'Descrizione di Evoluzione',
+            text2: 'Ut enim ad minim veniam...',
+            buttonText: 'Esplora il progetto'
+          }
+        }
+      ];
+
+      const positions = [
+        new THREE.Vector3(100, 50, 300),
+        new THREE.Vector3(-350, -40, 130),
+        new THREE.Vector3(150, -250, -350),
+        new THREE.Vector3(350, 570, -200),
+        new THREE.Vector3(350, 10, -100),
+        new THREE.Vector3(150, 180, -300),
+        new THREE.Vector3(150, 470, 200),
+        new THREE.Vector3(150, -370, 300),
+        new THREE.Vector3(-220, -560, -350),
+        new THREE.Vector3(-350, 350, 300),
+        new THREE.Vector3(-270, 10, -300),
+        new THREE.Vector3(-300, -400, 300),
+        new THREE.Vector3(-450, 350, -200),
+        new THREE.Vector3(450, 300, 300),
+        new THREE.Vector3(450, -250, 300)
+      ];
+
+      for (let i = 0; i < symbolData.length; i++) {
+        const data = symbolData[i];
+        let staticTexture;
+        try {
+          staticTexture = await new Promise((resolve, reject) => {
+            loader.load(
+              data.texture,
+              resolve,
+              undefined,
+              (err) => {
+                console.error("Errore nel caricamento della texture: " + data.texture, err);
+                reject(err);
+              }
+            );
+          });
+        } catch (e) {
+          console.error("Salto il simbolo " + data.name + " per errore nel caricamento della texture.");
+          continue;
+        }
+
+        const symbolGeometry = new THREE.PlaneGeometry(80, 80);
+
+        let spriteTexture;
+        let animatedSprite = null;
+        try {
+          spriteTexture = await new Promise((resolve, reject) => {
+            loader.load(
+              data.hoverSpritesheet,
+              resolve,
+              undefined,
+              (err) => {
+                console.error("Errore nel caricamento dello spritesheet: " + data.hoverSpritesheet, err);
+                reject(err);
+              }
+            );
+          });
+          animatedSprite = new AnimatedSpriteTexture(spriteTexture, data.frames, data.frameDuration);
+        } catch (error) {
+          console.error("Errore nel caricamento dello spritesheet per " + data.name, error);
+        }
+
+        const symbolMaterial = new THREE.MeshBasicMaterial({
+          map: staticTexture,
+          transparent: true,
+          opacity: 1.0,
+          side: THREE.DoubleSide,
+        });
+
+        const symbolMesh = new THREE.Mesh(symbolGeometry, symbolMaterial);
+        symbolMesh.position.set(positions[i].x, positions[i].y, positions[i].z);
+        symbolMesh.lookAt(new THREE.Vector3(0, 0, 0));
+
+        symbolMesh.userData = Object.assign({
+          name: data.name,
+          description: 'Descrizione dettagliata del simbolo ' + data.name,
+          image: data.image,
+          color: data.color || 'rgba(0,0,0,0.5)',
+          defaultTexture: staticTexture,
+          hoverTexture: animatedSprite
+        }, data.userData || {});
+
+        scene.add(symbolMesh);
+        symbols.push(symbolMesh);
+      }
+    }
+
+    function onWindowResize() {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    }
+
+    function onMouseMove(event) {
+      const x = event.clientX;
+      const y = event.clientY;
+      cursor.style.left = `${x}px`;
+      cursor.style.top = `${y}px`;
+      gsap.to(cursorTrail1, { duration: 0.1, left: x, top: y });
+      gsap.to(cursorTrail2, { duration: 0.2, left: x, top: y });
+      gsap.to(cursorTrail3, { duration: 0.3, left: x, top: y });
+
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      if (uniforms) {
+        uniforms.u_mouse.value.x = x / window.innerWidth;
+        uniforms.u_mouse.value.y = 1.0 - y / window.innerHeight;
+      }
+    }
+
+    // overlayAlpha => regola la trasparenza
+    function convertToRgba(colorStr, alpha) {
+      if (colorStr.startsWith("rgba(")) {
+        let parts = colorStr.slice(5, -1).split(",");
+        let r = parseInt(parts[0]);
+        let g = parseInt(parts[1]);
+        let b = parseInt(parts[2]);
+        return `rgba(${r},${g},${b},${alpha})`;
+      }
+      if (colorStr.startsWith("rgb(")) {
+        let parts = colorStr.slice(4, -1).split(",");
+        let r = parseInt(parts[0]);
+        let g = parseInt(parts[1]);
+        let b = parseInt(parts[2]);
+        return `rgba(${r},${g},${b},${alpha})`;
+      }
+      if (colorStr.startsWith("#")) {
+        let hex = colorStr.substring(1);
+        if (hex.length === 3) {
+          let r = parseInt(hex[0] + hex[0], 16);
+          let g = parseInt(hex[1] + hex[1], 16);
+          let b = parseInt(hex[2] + hex[2], 16);
+          return `rgba(${r},${g},${b},${alpha})`;
+        } else if (hex.length === 4) {
+          let r = parseInt(hex[0] + hex[0], 16);
+          let g = parseInt(hex[1] + hex[1], 16);
+          let b = parseInt(hex[2] + hex[2], 16);
+          return `rgba(${r},${g},${b},${alpha})`;
+        } else if (hex.length === 6 || hex.length === 8) {
+          let r = parseInt(hex.substring(0,2), 16);
+          let g = parseInt(hex.substring(2,4), 16);
+          let b = parseInt(hex.substring(4,6), 16);
+          return `rgba(${r},${g},${b},${alpha})`;
+        }
+      }
+      return `rgba(0,0,0,${alpha})`;
+    }
+
+    function onMouseClick(event) {
+      if (symbolOverlay.classList.contains('visible')) return;
+      event.preventDefault();
+
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(symbols);
+      if (intersects.length > 0) {
+        const clickedSymbol = intersects[0].object;
+        showOverlay(clickedSymbol.userData);
+
+        // Converte il colore in RGBA con trasparenza
+        const finalColor = convertToRgba(clickedSymbol.userData.color || 'rgba(0,0,0,0.5)', overlayAlpha);
+        backgroundOverlay.style.backgroundColor = finalColor;
+
+        showOverlaySymbol(clickedSymbol.userData);
+
+        // Nascondi i simboli 3D (rimane visibile solo la sfera)
+        symbols.forEach(sym => sym.visible = false);
+
+        document.body.classList.add('overlay-active');
+        gsap.to(infoContainer, { duration: 0.5, opacity: 0, ease: 'power2.out' });
+      }
+    }
+
+    function showOverlay(data) {
+      document.getElementById('overlay-image').src = data.mainImage || '';
+      document.getElementById('overlay-sheet').innerHTML = ''; // Svuota la scheda tecnica
+      symbolOverlay.classList.add('visible');
+    }
+
+    function showOverlaySymbol(data) {
+      overlaySymbol.style.backgroundColor = 'transparent';
+      overlaySymbol.style.display = 'flex';
+      overlaySymbol.innerHTML = '<img src="' + data.image + '" alt="' + data.name + '">';
+    }
+
+    document.getElementById('close-overlay').addEventListener('click', function() {
+      symbolOverlay.classList.remove('visible');
+      backgroundOverlay.style.backgroundColor = 'transparent';
+      document.body.classList.remove('overlay-active');
+      overlaySymbol.style.display = 'none';
+      symbols.forEach(sym => sym.visible = true);
+      gsap.to(infoContainer, { duration: 0.5, opacity: 1, ease: 'power2.out' });
+    });
+
+    symbolOverlay.addEventListener('click', function(event) {
+      if (event.target === this) {
+        symbolOverlay.classList.remove('visible');
+        backgroundOverlay.style.backgroundColor = 'transparent';
+        document.body.classList.remove('overlay-active');
+        overlaySymbol.style.display = 'none';
+        symbols.forEach(sym => sym.visible = true);
+        gsap.to(infoContainer, { duration: 0.5, opacity: 1, ease: 'power2.out' });
+      }
+    });
+
+    function centerSymbol(symbol) {
+      // La vista rimane invariata.
+    }
+    function resetCameraPosition() {
+      // Non usiamo questa funzione per la chiusura dell'overlay.
+    }
+
+    function checkIntersection() {
+      if (symbolOverlay.classList.contains('visible')) return;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(symbols);
+      if (intersects.length > 0) {
+        const object = intersects[0].object;
+        if (intersectedObject !== object) {
+          if (intersectedObject) {
+            gsap.to(intersectedObject.scale, { x: 1, y: 1, z: 1, duration: 0.5 });
+            if (intersectedObject.userData.hoverTexture) {
+              intersectedObject.userData.hoverTexture.pause();
+            }
+            intersectedObject.material.map = intersectedObject.userData.defaultTexture;
+          }
+          intersectedObject = object;
+          gsap.to(object.scale, { x: 1.5, y: 1.5, z: 1.5, duration: 0.5 });
+          if (object.userData.hoverTexture) {
+            object.userData.hoverTexture.play();
+            object.material.map = object.userData.hoverTexture.texture;
+          }
+          symbolNameElement.textContent = object.userData.name;
+          symbolDescriptionElement.textContent = object.userData.description;
+          gsap.to(infoContainer, { duration: 0.5, opacity: 1, ease: 'power2.out' });
+        }
+      } else {
+        if (intersectedObject) {
+          gsap.to(intersectedObject.scale, { x: 1, y: 1, z: 1, duration: 0.5 });
+          if (intersectedObject.userData.hoverTexture) {
+            intersectedObject.userData.hoverTexture.pause();
+          }
+          intersectedObject.material.map = intersectedObject.userData.defaultTexture;
+          intersectedObject = null;
+          gsap.to(infoContainer, { duration: 0.5, opacity: 0, ease: 'power2.out' });
+        }
+      }
+    }
+
+    let previousTime = performance.now();
+    function animate() {
+      requestAnimationFrame(animate);
+      const currentTime = performance.now();
+      const deltaTime = (currentTime - previousTime) / 1000;
+      previousTime = currentTime;
+
+      // Aggiorna animazioni sprite
+      for (let mesh of symbols) {
+        const animSprite = mesh.userData.hoverTexture;
+        if (animSprite && animSprite.isPlaying) {
+          animSprite.update(deltaTime);
+        }
+      }
+
+      // Rotazione lenta della sfera
+      if (sphere) {
+        sphere.rotation.y += 0.007;
+      }
+
+      // Controlli tastiera per ruotare pivot / spostare target
+      const horizontalSpeed = 0.009;
+      const verticalSpeed = 0.09;
+      if (keyState['ArrowLeft'] || keyState['KeyA']) {
+        pivot.rotation.y += horizontalSpeed;
+      }
+      if (keyState['ArrowRight'] || keyState['KeyD']) {
+        pivot.rotation.y -= horizontalSpeed;
+      }
+      if (keyState['ArrowUp'] || keyState['KeyW']) {
+        controls.target.y += verticalSpeed;
+      }
+      if (keyState['ArrowDown'] || keyState['KeyS']) {
+        controls.target.y -= verticalSpeed;
+      }
+      controls.target.y = Math.max(-100, Math.min(100, controls.target.y));
+      camera.lookAt(controls.target);
+
+      checkIntersection();
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    function init() {
+      scene = new THREE.Scene();
+
+      pivot = new THREE.Object3D();
+      scene.add(pivot);
+
+      camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+      camera.position.set(-500, 200, 300);
+      pivot.add(camera);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.getElementById('container').appendChild(renderer.domElement);
+
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+
+      document.body.tabIndex = 0;
+      document.body.focus();
+
+      const textureLoader = new THREE.TextureLoader();
+      textureLoader.crossOrigin = '';
+      textureLoader.load(
+        'Sfumatura-lr.jpg',
+        function (texture) {
+          texture.wrapS = THREE.ClampToEdgeWrapping;
+          texture.wrapT = THREE.ClampToEdgeWrapping;
+          texture.minFilter = THREE.LinearFilter;
+          uniforms = {
+            u_texture: { value: texture },
+            u_mouse: { value: new THREE.Vector2(0, 0) }
+          };
+          const geometry = new THREE.SphereGeometry(700, 228, 228);
+          const material = new THREE.ShaderMaterial({
+            uniforms: uniforms,
+            vertexShader: document.getElementById('vertexShader').textContent,
+            fragmentShader: document.getElementById('fragmentShader').textContent,
+            side: THREE.DoubleSide
+          });
+          sphere = new THREE.Mesh(geometry, material);
+          scene.add(sphere);
+        },
+        undefined,
+        function (err) {
+          console.error('Errore nel caricamento della sfumatura.', err);
+        }
+      );
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 1.75;
+      controls.enableZoom = true;
+      controls.enablePan = true;
+      controls.minDistance = 10;
+      controls.maxDistance = 10;
+      controls.target.set(0, 0, 0);
+      controls.addEventListener('start', hideInstructions, { once: true });
+
+      window.addEventListener('resize', onWindowResize, false);
+      document.addEventListener('mousemove', onMouseMove, false);
+      document.addEventListener('click', onMouseClick, false);
+
+      document.addEventListener('keydown', function(event) {
+        keyState[event.code] = true;
+        controls.enabled = false;
+      });
+      document.addEventListener('keyup', function(event) {
+        keyState[event.code] = false;
+        controls.enabled = true;
+      });
+
+      addSymbolsInsideSphere().then(() => {
+        onWindowResize();
+        animate();
+      });
+
+      gsap.timeline({ delay: 0.5 })
+        .to("#loader-text", { opacity: 1, duration: 0.5 })
+        .to("#loader-text", { y: -20, opacity: 0, duration: 0.5, delay: 1.5 })
+        .set("#loader-text", { textContent: "EGOTIONS", y: 50 })
+        .to("#loader-text", { y: 0, opacity: 1, duration: 0.5 })
+        .to("#preloader", { opacity: 0, duration: 0.5, delay: 1, onComplete: function() {
+          document.getElementById("preloader").style.display = "none";
+        }});
+    }
+    init();
+  </script>
+
+  <!-- Vertex Shader -->
+  <script id="vertexShader" type="x-shader/x-vertex">
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      vec3 pos = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+  </script>
+
+  <!-- Fragment Shader -->
+  <script id="fragmentShader" type="x-shader/x-fragment">
+    precision highp float;
+    uniform sampler2D u_texture;
+    uniform vec2 u_mouse;
+    varying vec2 vUv;
+    void main() {
+      vec2 uv = vUv;
+      vec2 mouse = vec2(u_mouse.x, 1.0 - u_mouse.y);
+      float dist = distance(uv, mouse);
+      float radius = 0.3;
+      float seamThreshold = 0.05;
+      float attenuation = 1.0;
+      if (uv.x < seamThreshold) {
+        attenuation = smoothstep(0.0, seamThreshold, uv.x);
+      } else if (uv.x > 1.0 - seamThreshold) {
+        attenuation = smoothstep(1.0, 1.0 - seamThreshold, uv.x);
+      }
+      if (dist < radius) {
+        float wave = sin((uv.x - mouse.x) * 15.0) * 0.06 * (1.0 - dist / radius);
+        wave *= attenuation;
+        uv.x += wave;
+        uv.y += wave;
+      }
+      vec4 color = texture2D(u_texture, uv);
+      gl_FragColor = color;
+    }
+  </script>
+</body>
+</html>
